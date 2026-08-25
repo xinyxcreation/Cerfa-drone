@@ -1,6 +1,8 @@
 class CompanyPilot {
   const CompanyPilot({
     required this.id,
+    this.companyId,
+    this.companyName,
     required this.email,
     required this.firstName,
     required this.lastName,
@@ -10,6 +12,9 @@ class CompanyPilot {
   });
 
   final String id;
+
+  final String? companyId;
+  final String? companyName;
   final String email;
   final String firstName;
   final String lastName;

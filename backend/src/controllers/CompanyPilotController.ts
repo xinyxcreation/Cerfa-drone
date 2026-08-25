@@ -100,6 +100,9 @@ export class CompanyPilotController {
                 phone:
                 pilot.phone,
 
+                company_name:
+                pilot.company_name,
+
                 joined_at:
                 pilot.joined_at,
 

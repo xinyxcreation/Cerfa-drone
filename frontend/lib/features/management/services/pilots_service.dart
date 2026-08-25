@@ -84,6 +84,35 @@ class PilotsService {
     }
   }
 
+  static Future<void> setCurrentUserPilot(
+    bool isPilot,
+  ) async {
+    try {
+      final method = isPilot ? 'put' : 'delete';
+
+      if (method == 'put') {
+        await ApiClient.instance.put(
+          '/auth/me/pilot',
+          data: {},
+        );
+      } else {
+        await ApiClient.instance.delete(
+          '/auth/me/pilot',
+        );
+      }
+
+    } on DioException catch (error) {
+      throw Exception(
+        _messageFromError(
+          error,
+          isPilot
+              ? 'Impossible de devenir pilote.'
+              : 'Impossible de retirer le statut pilote.',
+        ),
+      );
+    }
+  }
+
   static Future<void> deactivatePilot(
     String pilotId,
   ) async {

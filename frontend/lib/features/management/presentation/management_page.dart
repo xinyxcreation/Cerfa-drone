@@ -71,7 +71,10 @@ class ManagementPage extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const PilotsPage(),
+                      builder: (_) =>
+                      PilotsPage(
+                        user: user,
+                      ),
                     ),
                   );
                 },
@@ -1411,7 +1414,10 @@ extends State<EditCompanyPage> {
 class PilotsPage extends StatefulWidget {
   const PilotsPage({
     super.key,
+    required this.user,
   });
+
+  final CurrentUser user;
 
   @override
   State<PilotsPage> createState() =>
@@ -1445,7 +1451,9 @@ class _PilotsPageState extends State<PilotsPage> {
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) =>
-        const CreatePilotPage(),
+        CreatePilotPage(
+          user: widget.user,
+        ),
       ),
     );
 
@@ -1528,9 +1536,7 @@ class _PilotsPageState extends State<PilotsPage> {
                   const SizedBox(height: 16),
 
                   if (pilots.isEmpty)
-                    _EmptyPilotsState(
-                      onAdd: _openCreatePilot,
-                    )
+                  const _EmptyPilotsState()
                     else
                       ...pilots.map(
                         (pilot) => Padding(
@@ -1748,7 +1754,10 @@ class _PilotCard extends StatelessWidget {
 class CreatePilotPage extends StatefulWidget {
   const CreatePilotPage({
     super.key,
+    required this.user,
   });
+
+  final CurrentUser user;
 
   @override
   State<CreatePilotPage> createState() =>
@@ -1777,6 +1786,7 @@ extends State<CreatePilotPage> {
 
   bool _obscurePassword = true;
   bool _loading = false;
+  bool _isSelfPilot = false;
 
   @override
   void dispose() {
@@ -1790,49 +1800,57 @@ extends State<CreatePilotPage> {
   }
 
   Future<void> _create() async {
-    if (!_formKey.currentState!
-      .validate()) {
+    if (!_formKey.currentState!.validate()) {
       return;
-      }
+    }
 
-      setState(() {
-        _loading = true;
-      });
+    setState(() {
+      _loading = true;
+    });
 
     try {
-      await PilotsService.createPilot(
-        firstname:
-        _firstnameController.text,
-        lastname:
-        _lastnameController.text,
-        email:
-        _emailController.text,
-        password:
-        _passwordController.text,
-        phone:
-        _phoneController.text,
-      );
+      if (_isSelfPilot) {
+        await PilotsService.setCurrentUserPilot(true);
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Vous êtes maintenant pilote.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        await PilotsService.createPilot(
+          firstname: _firstnameController.text,
+          lastname: _lastnameController.text,
+          email: _emailController.text,
+          password: _passwordController.text,
+          phone: _phoneController.text,
+        );
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Pilote créé avec succès.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
 
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context)
-      .showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Pilote créé avec succès.',
-          ),
-          behavior:
-          SnackBarBehavior.floating,
-        ),
-      );
 
       Navigator.of(context).pop(true);
 
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context)
-      .showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             error.toString().replaceFirst(
@@ -1840,10 +1858,9 @@ extends State<CreatePilotPage> {
               '',
             ),
           ),
-          behavior:
-          SnackBarBehavior.floating,
+          behavior: SnackBarBehavior.floating,
           backgroundColor:
-          const Color(0xFFB91C1C),
+              const Color(0xFFB91C1C),
         ),
       );
     } finally {
@@ -1865,6 +1882,49 @@ extends State<CreatePilotPage> {
           key: _formKey,
           child: Column(
             children: [
+              if (!widget.user.isPilot) ...[
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: CheckboxListTile(
+                    value: _isSelfPilot,
+                    onChanged: _loading
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _isSelfPilot = value ?? false;
+
+                              if (_isSelfPilot) {
+                                _firstnameController.text =
+                                    widget.user.firstName;
+                                _lastnameController.text =
+                                    widget.user.lastName;
+                                _emailController.text =
+                                    widget.user.email;
+                                _phoneController.text =
+                                    widget.user.phone ?? '';
+                              }
+                            });
+                          },
+                    secondary: const Icon(
+                      Icons.flight_outlined,
+                    ),
+                    title: const Text(
+                      'Je suis pilote',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Utiliser mon compte actuel comme pilote.',
+                    ),
+                    controlAffinity:
+                        ListTileControlAffinity.trailing,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+              ],
+
               _FormField(
                 controller:
                 _firstnameController,
@@ -1946,16 +2006,17 @@ extends State<CreatePilotPage> {
 
               const SizedBox(height: 12),
 
-              TextFormField(
-                controller:
-                _passwordController,
-                obscureText:
-                _obscurePassword,
-                enabled: !_loading,
-                validator: (value) {
-                  if (value == null ||
-                    value.isEmpty) {
-                    return 'Le mot de passe est obligatoire.';
+              if (!_isSelfPilot) ...[
+                TextFormField(
+                  controller:
+                  _passwordController,
+                  obscureText:
+                  _obscurePassword,
+                  enabled: !_loading,
+                  validator: (value) {
+                    if (value == null ||
+                      value.isEmpty) {
+                      return 'Le mot de passe est obligatoire.';
                     }
 
                     if (value.length < 8) {
@@ -1963,29 +2024,30 @@ extends State<CreatePilotPage> {
                     }
 
                     return null;
-                },
-                decoration:
-                _inputDecoration(
-                  label: 'Mot de passe initial',
-                  icon:
-                  Icons.lock_outline,
-                  suffixIcon:
-                  IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword =
-                        !_obscurePassword;
-                      });
-                    },
-                    icon: Icon(
-                      _obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons
-                      .visibility_off_outlined,
+                  },
+                  decoration:
+                  _inputDecoration(
+                    label: 'Mot de passe initial',
+                    icon:
+                    Icons.lock_outline,
+                    suffixIcon:
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword =
+                          !_obscurePassword;
+                        });
+                      },
+                      icon: Icon(
+                        _obscurePassword
+                        ? Icons.visibility_outlined
+                        : Icons
+                        .visibility_off_outlined,
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
 
               const SizedBox(height: 10),
 
@@ -2498,11 +2560,7 @@ extends StatelessWidget {
 
 class _EmptyPilotsState
 extends StatelessWidget {
-  const _EmptyPilotsState({
-    required this.onAdd,
-  });
-
-  final VoidCallback onAdd;
+  const _EmptyPilotsState();
 
   @override
   Widget build(BuildContext context) {
@@ -2545,20 +2603,6 @@ extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          FilledButton.icon(
-            onPressed: onAdd,
-            style: FilledButton.styleFrom(
-              backgroundColor:
-              const Color(0xFFE30613),
-              foregroundColor: Colors.white,
-            ),
-            icon: const Icon(
-              Icons.person_add_outlined,
-            ),
-            label: const Text(
-              'Ajouter un pilote',
-            ),
-          ),
         ],
       ),
     );

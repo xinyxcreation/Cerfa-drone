@@ -38,6 +38,7 @@ export interface CompanyMember extends RowDataPacket {
     role_label: string;
 
     is_pilot: boolean;
+    company_name: string;
 }
 
 export class CompanyUserRepository extends BaseRepository {
@@ -185,6 +186,7 @@ export class CompanyUserRepository extends BaseRepository {
                 SELECT
                     cu.id,
                     cu.company_id,
+                    c.name AS company_name,
                     cu.user_id,
 
                     u.email,
@@ -203,6 +205,9 @@ export class CompanyUserRepository extends BaseRepository {
 
                 INNER JOIN users u
                     ON u.id = cu.user_id
+
+                INNER JOIN companies c
+                    ON c.id = cu.company_id
 
                 INNER JOIN roles r
                     ON r.id = cu.role_id

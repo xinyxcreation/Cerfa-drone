@@ -82,6 +82,38 @@ class ProfileService {
     }
   }
 
+  static Future<bool> setPilot(bool enabled) async {
+    try {
+      final response = enabled
+          ? await ApiClient.instance.put(
+              '/auth/me/pilot',
+            )
+          : await ApiClient.instance.delete(
+              '/auth/me/pilot',
+            );
+
+      final data = Map<String, dynamic>.from(
+        response.data as Map,
+      );
+
+      if (data['success'] != true) {
+        throw Exception(
+          data['message'] ??
+              'Impossible de modifier le statut pilote.',
+        );
+      }
+
+      return data['is_pilot'] == true;
+    } on DioException catch (error) {
+      throw Exception(
+        _messageFromError(
+          error,
+          'Impossible de modifier le statut pilote.',
+        ),
+      );
+    }
+  }
+
   static String _messageFromError(
     DioException error,
     String fallback,
