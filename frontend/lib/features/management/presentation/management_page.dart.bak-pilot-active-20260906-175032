@@ -1,0 +1,5263 @@
+import 'package:flutter/material.dart';
+
+import '../../auth/models/current_user.dart';
+import '../models/company_pilot.dart';
+import '../models/company_drone.dart';
+import '../services/pilots_service.dart';
+import '../services/drones_service.dart';
+import '../../models/company.dart';
+import '../../company/services/company_service.dart';
+import '../../missions/models/mission.dart';
+import '../../missions/services/missions_service.dart';
+import '../models/company_client.dart';
+import '../models/company_site.dart';
+import '../services/clients_service.dart';
+import '../services/sites_service.dart';
+import '../models/mission_category.dart';
+import '../services/mission_categories_service.dart';
+
+typedef ManagementPageOpener =
+    void Function(Widget page, {VoidCallback? onReturn});
+
+class ManagementBackScope extends InheritedWidget {
+  const ManagementBackScope({
+    super.key,
+    required this.onBack,
+    required super.child,
+  });
+
+  final VoidCallback onBack;
+
+  static ManagementBackScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<ManagementBackScope>();
+  }
+
+  @override
+  bool updateShouldNotify(ManagementBackScope oldWidget) {
+    return onBack != oldWidget.onBack;
+  }
+}
+
+class ManagementPage extends StatelessWidget {
+  const ManagementPage({
+    super.key,
+    required this.user,
+    required this.onOpenPage,
+  });
+
+  final CurrentUser user;
+  final ManagementPageOpener onOpenPage;
+
+  @override
+  Widget build(BuildContext context) {
+    final role = user.role.toUpperCase();
+    final canManageCompany = role == 'OWNER' || role == 'MANAGER';
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF111111),
+        foregroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+        titleSpacing: 16,
+        title: const Text(
+          'Gestion',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
+      ),
+
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 30),
+        children: [
+          if (canManageCompany)
+            _ManagementCard(
+              icon: Icons.business_outlined,
+              title: 'Entreprise',
+              subtitle: user.companyName,
+              onTap: () {
+                onOpenPage(CompanyPage(user: user));
+              },
+            ),
+
+          const SizedBox(height: 12),
+
+          if (canManageCompany)
+            _ManagementCard(
+              icon: Icons.person_outline,
+              title: 'Pilotes',
+              subtitle: 'Gérer les pilotes de l’entreprise',
+              onTap: () {
+                onOpenPage(PilotsPage(user: user, onOpenPage: onOpenPage));
+              },
+            ),
+
+          const SizedBox(height: 12),
+
+          _ManagementCard(
+            icon: Icons.flight_outlined,
+            title: 'Drones',
+            subtitle: 'Gérer les drones de l’entreprise',
+            onTap: () {
+              onOpenPage(DronesPage(onOpenPage: onOpenPage));
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          _ManagementCard(
+            icon: Icons.location_on_outlined,
+            title: 'Sites',
+            subtitle: 'Gérer les sites d’intervention',
+            onTap: () {
+              onOpenPage(SitesPage(onOpenPage: onOpenPage));
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          _ManagementCard(
+            icon: Icons.category_outlined,
+            title: 'Catégories',
+            subtitle: 'Gérer les catégories de missions',
+            onTap: () {
+              onOpenPage(const MissionCategoriesPage());
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          _ManagementCard(
+            icon: Icons.folder_outlined,
+            title: 'Documents',
+            subtitle: 'Documents et justificatifs',
+            onTap: () {
+              onOpenPage(const DocumentsPage());
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          _ManagementCard(
+            icon: Icons.settings_outlined,
+            title: 'Paramètres',
+            subtitle: 'Configuration de CERFA DRONE',
+            onTap: () {
+              onOpenPage(const SettingsPage());
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// CARTE GESTION
+// ==================================================================
+
+class _ManagementCard extends StatelessWidget {
+  const _ManagementCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE4E4),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(icon, color: const Color(0xFFE30613), size: 25),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF222222),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Color(0xFF777777)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// ENTREPRISE
+// ==================================================================
+
+class CompanyPage extends StatefulWidget {
+  const CompanyPage({super.key, required this.user});
+
+  final CurrentUser user;
+
+  @override
+  State<CompanyPage> createState() => _CompanyPageState();
+}
+
+class _CompanyPageState extends State<CompanyPage> {
+  late Future<Company> _companyFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCompany();
+  }
+
+  void _loadCompany() {
+    _companyFuture = CompanyService.getCompany();
+  }
+
+  Future<void> _refresh() async {
+    setState(_loadCompany);
+
+    try {
+      await _companyFuture;
+    } catch (_) {}
+  }
+
+  Future<void> _editCompany(Company company) async {
+    final updated = await Navigator.of(context).push<Company>(
+      MaterialPageRoute(builder: (_) => EditCompanyPage(company: company)),
+    );
+
+    if (updated != null && mounted) {
+      setState(() {
+        _companyFuture = Future.value(updated);
+      });
+    }
+  }
+
+  String _roleLabel(String role) {
+    switch (role.toUpperCase()) {
+      case 'OWNER':
+        return 'Propriétaire';
+
+      case 'MANAGER':
+        return 'Gestionnaire';
+
+      case 'PILOT':
+        return 'Pilote';
+
+      default:
+        return role;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final role = widget.user.role.toUpperCase();
+    final canEdit = role == 'OWNER' || role == 'MANAGER';
+
+    return _ManagementSubPage(
+      title: 'Entreprise',
+      icon: Icons.business_outlined,
+      actions: [
+        IconButton(
+          tooltip: 'Actualiser',
+          onPressed: _refresh,
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+      children: [
+        FutureBuilder<Company>(
+          future: _companyFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const _CompanyLoadingState();
+            }
+
+            if (snapshot.hasError) {
+              return _CompanyErrorState(
+                message:
+                    snapshot.error?.toString().replaceFirst(
+                      'Exception: ',
+                      '',
+                    ) ??
+                    'Impossible de charger l’entreprise.',
+                onRetry: () {
+                  setState(_loadCompany);
+                },
+              );
+            }
+
+            final company = snapshot.data;
+
+            if (company == null) {
+              return _CompanyErrorState(
+                message: 'Aucune entreprise disponible.',
+                onRetry: () {
+                  setState(_loadCompany);
+                },
+              );
+            }
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _CompanyHeaderCard(
+                  company: company,
+                  role: _roleLabel(widget.user.role),
+                  canEdit: canEdit,
+                  onEdit: () => _editCompany(company),
+                ),
+
+                const SizedBox(height: 16),
+
+                _CompanySection(
+                  title: 'Identité',
+                  icon: Icons.business_outlined,
+                  children: [
+                    _CompanyInfoRow(
+                      label: 'Nom de l’entreprise',
+                      value: company.name,
+                    ),
+                    _CompanyInfoRow(
+                      label: 'Raison sociale',
+                      value: company.legalName,
+                    ),
+                    _CompanyInfoRow(
+                      label: 'Nom du contact',
+                      value: company.contactName,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                _CompanySection(
+                  title: 'Informations administratives',
+                  icon: Icons.badge_outlined,
+                  children: [
+                    _CompanyInfoRow(label: 'SIRET', value: company.siret),
+                    _CompanyInfoRow(
+                      label: 'N° exploitant AlphaTango',
+                      value: company.alphatangoOperatorNumber,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                _CompanySection(
+                  title: 'Coordonnées',
+                  icon: Icons.contact_phone_outlined,
+                  children: [
+                    _CompanyInfoRow(label: 'E-mail', value: company.email),
+                    _CompanyInfoRow(label: 'Téléphone', value: company.phone),
+                    _CompanyInfoRow(
+                      label: 'Site internet',
+                      value: company.websiteUrl,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                _CompanySection(
+                  title: 'Adresse',
+                  icon: Icons.location_on_outlined,
+                  children: [
+                    _CompanyInfoRow(
+                      label: 'Adresse',
+                      value: company.addressLine1,
+                    ),
+                    _CompanyInfoRow(
+                      label: 'Complément',
+                      value: company.addressLine2,
+                    ),
+                    _CompanyInfoRow(
+                      label: 'Code postal',
+                      value: company.postalCode,
+                    ),
+                    _CompanyInfoRow(label: 'Ville', value: company.city),
+                    _CompanyInfoRow(label: 'Pays', value: company.country),
+                  ],
+                ),
+
+                if (company.notes != null &&
+                    company.notes!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _CompanySection(
+                    title: 'Notes',
+                    icon: Icons.notes_outlined,
+                    children: [
+                      _CompanyInfoRow(label: 'Notes', value: company.notes),
+                    ],
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+// ==================================================================
+// EN-TÊTE ENTREPRISE
+// ==================================================================
+
+class _CompanyHeaderCard extends StatelessWidget {
+  const _CompanyHeaderCard({
+    required this.company,
+    required this.role,
+    required this.canEdit,
+    required this.onEdit,
+  });
+
+  final Company company;
+  final String role;
+  final bool canEdit;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 4),
+
+          Text(
+            company.name,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF222222),
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFE4E4),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              role,
+              style: const TextStyle(
+                color: Color(0xFFE30613),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+
+          if (canEdit) ...[
+            const SizedBox(height: 18),
+
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onEdit,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFE30613),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                icon: const Icon(Icons.edit_outlined, size: 19),
+                label: const Text(
+                  'Modifier l’entreprise',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// SECTION ENTREPRISE
+// ==================================================================
+
+class _CompanySection extends StatelessWidget {
+  const _CompanySection({
+    required this.title,
+    required this.icon,
+    required this.children,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: const Color(0xFFE30613), size: 21),
+
+              const SizedBox(width: 9),
+
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF222222),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          ...children,
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// INFORMATION ENTREPRISE
+// ==================================================================
+
+class _CompanyInfoRow extends StatelessWidget {
+  const _CompanyInfoRow({required this.label, required this.value});
+
+  final String label;
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final displayValue = value == null || value!.trim().isEmpty
+        ? 'Non renseigné'
+        : value!.trim();
+
+    final empty = value == null || value!.trim().isEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 13),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          Text(
+            displayValue,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: empty ? Colors.grey.shade400 : const Color(0xFF222222),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// CHAMPS FORMULAIRE
+// ==================================================================
+
+class _FormField extends StatelessWidget {
+  const _FormField({
+    required this.controller,
+    required this.label,
+    required this.icon,
+    this.validator,
+    this.keyboardType,
+    this.enabled = true,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final String? Function(String?)? validator;
+  final TextInputType? keyboardType;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextFormField(
+      controller: controller,
+      enabled: enabled,
+      keyboardType: keyboardType,
+      validator: validator,
+      decoration: _inputDecoration(label: label, icon: icon),
+    );
+  }
+}
+
+InputDecoration _inputDecoration({
+  required String label,
+  required IconData icon,
+  Widget? suffixIcon,
+}) {
+  return InputDecoration(
+    labelText: label,
+    prefixIcon: Icon(icon),
+    suffixIcon: suffixIcon,
+    filled: true,
+    fillColor: Colors.white,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(13),
+      borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(13),
+      borderSide: BorderSide.none,
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(13),
+      borderSide: const BorderSide(color: Color(0xFFE30613), width: 1.4),
+    ),
+  );
+}
+
+class _PilotCertificationTile extends StatelessWidget {
+  const _PilotCertificationTile({required this.certification});
+
+  final PilotCertification certification;
+
+  @override
+  Widget build(BuildContext context) {
+    final expired = certification.isExpired;
+    final expiringSoon = certification.isExpiringSoon;
+
+    final Color statusColor;
+
+    if (expired || !certification.isValid) {
+      statusColor = const Color(0xFFE30613);
+    } else if (expiringSoon) {
+      statusColor = Colors.orange;
+    } else {
+      statusColor = Colors.green;
+    }
+
+    final String status;
+
+    if (expired) {
+      status = 'Expirée';
+    } else if (!certification.isValid) {
+      status = 'Invalide';
+    } else if (expiringSoon) {
+      status = 'Expire bientôt';
+    } else {
+      status = 'Valide';
+    }
+
+    String formatDate(DateTime? date) {
+      if (date == null) return '—';
+
+      return '${date.day.toString().padLeft(2, '0')}/'
+          '${date.month.toString().padLeft(2, '0')}/'
+          '${date.year}';
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  certification.label,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            'Obtenue le ${formatDate(certification.obtainedAt)}',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+          ),
+
+          if (certification.expiresAt != null) ...[
+            const SizedBox(height: 3),
+            Text(
+              'Expiration : ${formatDate(certification.expiresAt)}',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            ),
+          ],
+
+          if (certification.description != null &&
+              certification.description!.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              certification.description!,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
+
+          if (certification.notes != null &&
+              certification.notes!.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              certification.notes!,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// CHARGEMENT ENTREPRISE
+// ==================================================================
+
+class _CompanyLoadingState extends StatelessWidget {
+  const _CompanyLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.all(40),
+      child: Center(child: CircularProgressIndicator(color: Color(0xFFE30613))),
+    );
+  }
+}
+
+// ==================================================================
+// ERREUR ENTREPRISE
+// ==================================================================
+
+class _CompanyErrorState extends StatelessWidget {
+  const _CompanyErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFFE30613), size: 46),
+
+          const SizedBox(height: 14),
+
+          const Text(
+            'Impossible de charger l’entreprise',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+          ),
+
+          const SizedBox(height: 18),
+
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Réessayer'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+// ==================================================================
+// MODIFICATION ENTREPRISE
+// ==================================================================
+
+class EditCompanyPage extends StatefulWidget {
+  const EditCompanyPage({super.key, required this.company});
+
+  final Company company;
+
+  @override
+  State<EditCompanyPage> createState() => _EditCompanyPageState();
+}
+
+class _EditCompanyPageState extends State<EditCompanyPage> {
+  final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _nameController;
+
+  late final TextEditingController _legalNameController;
+
+  late final TextEditingController _contactNameController;
+
+  late final TextEditingController _siretController;
+
+  late final TextEditingController _alphaTangoController;
+
+  late final TextEditingController _emailController;
+
+  late final TextEditingController _phoneController;
+
+  late final TextEditingController _websiteController;
+
+  late final TextEditingController _address1Controller;
+
+  late final TextEditingController _address2Controller;
+
+  late final TextEditingController _postalCodeController;
+
+  late final TextEditingController _cityController;
+
+  late final TextEditingController _countryController;
+
+  late final TextEditingController _notesController;
+
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final company = widget.company;
+
+    _nameController = TextEditingController(text: company.name);
+
+    _legalNameController = TextEditingController(text: company.legalName ?? '');
+
+    _contactNameController = TextEditingController(
+      text: company.contactName ?? '',
+    );
+
+    _siretController = TextEditingController(text: company.siret ?? '');
+
+    _alphaTangoController = TextEditingController(
+      text: company.alphatangoOperatorNumber,
+    );
+
+    _emailController = TextEditingController(text: company.email ?? '');
+
+    _phoneController = TextEditingController(text: company.phone ?? '');
+
+    _websiteController = TextEditingController(text: company.websiteUrl ?? '');
+
+    _address1Controller = TextEditingController(
+      text: company.addressLine1 ?? '',
+    );
+
+    _address2Controller = TextEditingController(
+      text: company.addressLine2 ?? '',
+    );
+
+    _postalCodeController = TextEditingController(
+      text: company.postalCode ?? '',
+    );
+
+    _cityController = TextEditingController(text: company.city ?? '');
+
+    _countryController = TextEditingController(text: company.country);
+
+    _notesController = TextEditingController(text: company.notes ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _legalNameController.dispose();
+    _contactNameController.dispose();
+    _siretController.dispose();
+    _alphaTangoController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _websiteController.dispose();
+    _address1Controller.dispose();
+    _address2Controller.dispose();
+    _postalCodeController.dispose();
+    _cityController.dispose();
+    _countryController.dispose();
+    _notesController.dispose();
+
+    super.dispose();
+  }
+
+  String? _nullable(TextEditingController controller) {
+    final value = controller.text.trim();
+
+    return value.isEmpty ? null : value;
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+    });
+
+    final updated = Company(
+      id: widget.company.id,
+      name: _nameController.text.trim(),
+      legalName: _nullable(_legalNameController),
+      contactName: _nullable(_contactNameController),
+      siret: _nullable(_siretController),
+      alphatangoOperatorNumber: _alphaTangoController.text.trim(),
+      email: _nullable(_emailController),
+      phone: _nullable(_phoneController),
+      websiteUrl: _nullable(_websiteController),
+      addressLine1: _nullable(_address1Controller),
+      addressLine2: _nullable(_address2Controller),
+      postalCode: _nullable(_postalCodeController),
+      city: _nullable(_cityController),
+      country: _countryController.text.trim(),
+      logoPath: widget.company.logoPath,
+      signaturePath: widget.company.signaturePath,
+      isActive: widget.company.isActive,
+      notes: _nullable(_notesController),
+      createdAt: widget.company.createdAt,
+      updatedAt: widget.company.updatedAt,
+    );
+
+    try {
+      final result = await CompanyService.updateCompany(updated);
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Entreprise enregistrée.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      Navigator.of(context).pop(result);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: const Color(0xFFB91C1C),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSubPage(
+      title: 'Modifier l’entreprise',
+      icon: Icons.business_outlined,
+      children: [
+        Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              _FormField(
+                controller: _nameController,
+                label: 'Nom de l’entreprise',
+                icon: Icons.business_outlined,
+                enabled: !_loading,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Le nom de l’entreprise est obligatoire.';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _legalNameController,
+                label: 'Raison sociale',
+                icon: Icons.badge_outlined,
+                enabled: !_loading,
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _contactNameController,
+                label: 'Nom du contact',
+                icon: Icons.person_outline,
+                enabled: !_loading,
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _siretController,
+                label: 'SIRET',
+                icon: Icons.numbers_outlined,
+                keyboardType: TextInputType.number,
+                enabled: !_loading,
+                validator: (value) {
+                  final siret = value?.trim() ?? '';
+
+                  if (siret.isEmpty) {
+                    return null;
+                  }
+
+                  if (!RegExp(r'^\d{14}$').hasMatch(siret)) {
+                    return 'Le SIRET doit contenir exactement 14 chiffres.';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _alphaTangoController,
+                label: 'N° exploitant AlphaTango',
+                icon: Icons.flight_takeoff_outlined,
+                enabled: !_loading,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Le numéro AlphaTango est obligatoire.';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _emailController,
+                label: 'E-mail',
+                icon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
+                enabled: !_loading,
+                validator: (value) {
+                  final email = value?.trim() ?? '';
+
+                  if (email.isEmpty) {
+                    return null;
+                  }
+
+                  if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                    return 'Adresse e-mail invalide.';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _phoneController,
+                label: 'Téléphone',
+                icon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+                enabled: !_loading,
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _websiteController,
+                label: 'Site internet',
+                icon: Icons.language_outlined,
+                keyboardType: TextInputType.url,
+                enabled: !_loading,
+              ),
+
+              const SizedBox(height: 20),
+
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Adresse',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF222222),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _address1Controller,
+                label: 'Adresse',
+                icon: Icons.location_on_outlined,
+                enabled: !_loading,
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _address2Controller,
+                label: 'Complément d’adresse',
+                icon: Icons.home_outlined,
+                enabled: !_loading,
+              ),
+
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _FormField(
+                      controller: _postalCodeController,
+                      label: 'Code postal',
+                      icon: Icons.markunread_mailbox_outlined,
+                      keyboardType: TextInputType.number,
+                      enabled: !_loading,
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  Expanded(
+                    child: _FormField(
+                      controller: _cityController,
+                      label: 'Ville',
+                      icon: Icons.location_city_outlined,
+                      enabled: !_loading,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _countryController,
+                label: 'Pays',
+                icon: Icons.public_outlined,
+                enabled: !_loading,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Le pays est obligatoire.';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 20),
+
+              TextFormField(
+                controller: _notesController,
+                enabled: !_loading,
+                maxLines: 5,
+                decoration: _inputDecoration(
+                  label: 'Notes',
+                  icon: Icons.notes_outlined,
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _loading ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE30613),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                  ),
+                  child: _loading
+                      ? const SizedBox(
+                          width: 21,
+                          height: 21,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Enregistrer',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================================================================
+// PILOTES
+// ==================================================================
+
+class PilotsPage extends StatefulWidget {
+  const PilotsPage({super.key, required this.user, required this.onOpenPage});
+
+  final CurrentUser user;
+  final ManagementPageOpener onOpenPage;
+
+  @override
+  State<PilotsPage> createState() => _PilotsPageState();
+}
+
+class _PilotsPageState extends State<PilotsPage> {
+  late Future<List<CompanyPilot>> _pilotsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPilots();
+  }
+
+  void _loadPilots() {
+    _pilotsFuture = PilotsService.getPilots();
+  }
+
+  Future<void> _refresh() async {
+    setState(_loadPilots);
+
+    try {
+      await _pilotsFuture;
+    } catch (_) {}
+  }
+
+  void _openCreatePilot() {
+    widget.onOpenPage(
+      CreatePilotPage(user: widget.user),
+      onReturn: _loadPilots,
+    );
+  }
+
+  void _openPilot(CompanyPilot pilot) {
+    widget.onOpenPage(PilotDetailsPage(pilot: pilot), onReturn: _loadPilots);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSubPage(
+      title: 'Pilotes',
+      icon: Icons.person_outline,
+      actions: [
+        IconButton(
+          tooltip: 'Actualiser',
+          onPressed: _refresh,
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+      children: [
+        FutureBuilder<List<CompanyPilot>>(
+          future: _pilotsFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const _PilotLoadingState();
+            }
+
+            if (snapshot.hasError) {
+              return _PilotErrorState(
+                message:
+                    snapshot.error?.toString().replaceFirst(
+                      'Exception: ',
+                      '',
+                    ) ??
+                    'Impossible de charger les pilotes.',
+                onRetry: () {
+                  setState(_loadPilots);
+                },
+              );
+            }
+
+            final pilots = snapshot.data ?? [];
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _PilotHeader(count: pilots.length, onAdd: _openCreatePilot),
+
+                const SizedBox(height: 16),
+
+                if (pilots.isEmpty)
+                  const _EmptyPilotsState()
+                else
+                  ...pilots.map(
+                    (pilot) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _PilotCard(
+                        pilot: pilot,
+                        onTap: () => _openPilot(pilot),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ==================================================================
+// HEADER PILOTES
+// ==================================================================
+
+class _PilotHeader extends StatelessWidget {
+  const _PilotHeader({required this.count, required this.onAdd});
+
+  final int count;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Équipe de pilotes',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF222222),
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              Text(
+                count == 0
+                    ? 'Aucun pilote'
+                    : '$count pilote${count > 1 ? 's' : ''}',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        FilledButton.icon(
+          onPressed: onAdd,
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFE30613),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.person_add_outlined, size: 19),
+          label: const Text(
+            'Ajouter',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================================================================
+// CARTE PILOTE
+// ==================================================================
+
+class _PilotCard extends StatelessWidget {
+  const _PilotCard({required this.pilot, required this.onTap});
+
+  final CompanyPilot pilot;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE4E4),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  pilot.initials,
+                  style: const TextStyle(
+                    color: Color(0xFFE30613),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 14),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      pilot.displayName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF222222),
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      pilot.email,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+
+                    if (pilot.phone != null &&
+                        pilot.phone!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        pilot.phone!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              const Icon(Icons.chevron_right, color: Color(0xFF777777)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// AJOUT PILOTE
+// ==================================================================
+
+class CreatePilotPage extends StatefulWidget {
+  const CreatePilotPage({super.key, required this.user});
+
+  final CurrentUser user;
+
+  @override
+  State<CreatePilotPage> createState() => _CreatePilotPageState();
+}
+
+class _CreatePilotPageState extends State<CreatePilotPage> {
+  final _formKey = GlobalKey<FormState>();
+
+  final _firstnameController = TextEditingController();
+
+  final _lastnameController = TextEditingController();
+
+  final _emailController = TextEditingController();
+
+  final _phoneController = TextEditingController();
+
+  final _passwordController = TextEditingController();
+
+  bool _obscurePassword = true;
+  bool _loading = false;
+  bool _isSelfPilot = false;
+  bool _alreadyPilot = false;
+  bool _checkingPilot = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfAlreadyPilot();
+  }
+
+  Future<void> _checkIfAlreadyPilot() async {
+    try {
+      final pilots = await PilotsService.getPilots();
+
+      final currentEmail = widget.user.email.trim().toLowerCase();
+
+      final alreadyPilot = pilots.any(
+        (pilot) => pilot.email.trim().toLowerCase() == currentEmail,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _alreadyPilot = alreadyPilot;
+        _checkingPilot = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _checkingPilot = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _firstnameController.dispose();
+    _lastnameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+
+    super.dispose();
+  }
+
+  Future<void> _create() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      if (_isSelfPilot) {
+        await PilotsService.setCurrentUserPilot(true);
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vous êtes maintenant pilote.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        await PilotsService.createPilot(
+          firstname: _firstnameController.text,
+          lastname: _lastnameController.text,
+          email: _emailController.text,
+          password: _passwordController.text,
+          phone: _phoneController.text,
+        );
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pilote créé avec succès.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
+      if (!mounted) return;
+
+      ManagementBackScope.maybeOf(context)?.onBack();
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: const Color(0xFFB91C1C),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSubPage(
+      title: 'Ajouter un pilote',
+      icon: Icons.person_add_outlined,
+      children: [
+        Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              if (!_checkingPilot &&
+                  !widget.user.isPilot &&
+                  !_alreadyPilot) ...[
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: CheckboxListTile(
+                    value: _isSelfPilot,
+                    onChanged: _loading
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _isSelfPilot = value ?? false;
+
+                              if (_isSelfPilot) {
+                                _firstnameController.text =
+                                    widget.user.firstName;
+                                _lastnameController.text = widget.user.lastName;
+                                _emailController.text = widget.user.email;
+                                _phoneController.text = widget.user.phone ?? '';
+                              }
+                            });
+                          },
+                    secondary: const Icon(Icons.flight_outlined),
+                    title: const Text(
+                      'Je suis pilote',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: const Text(
+                      'Utiliser mon compte actuel comme pilote.',
+                    ),
+                    controlAffinity: ListTileControlAffinity.trailing,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+              ],
+
+              _FormField(
+                controller: _firstnameController,
+                label: 'Prénom',
+                icon: Icons.person_outline,
+                enabled: !_loading,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Le prénom est obligatoire.';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _lastnameController,
+                label: 'Nom',
+                icon: Icons.person_outline,
+                enabled: !_loading,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Le nom est obligatoire.';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _emailController,
+                label: 'Adresse e-mail',
+                icon: Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
+                enabled: !_loading,
+                validator: (value) {
+                  final email = value?.trim() ?? '';
+
+                  if (email.isEmpty) {
+                    return 'L’adresse e-mail est obligatoire.';
+                  }
+
+                  final valid = RegExp(
+                    r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                  ).hasMatch(email);
+
+                  if (!valid) {
+                    return 'Adresse e-mail invalide.';
+                  }
+
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: _phoneController,
+                label: 'Téléphone',
+                icon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+                enabled: !_loading,
+              ),
+
+              const SizedBox(height: 12),
+
+              if (!_isSelfPilot) ...[
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  enabled: !_loading,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Le mot de passe est obligatoire.';
+                    }
+
+                    if (value.length < 8) {
+                      return '8 caractères minimum.';
+                    }
+
+                    return null;
+                  },
+                  decoration: _inputDecoration(
+                    label: 'Mot de passe initial',
+                    icon: Icons.lock_outline,
+                    suffixIcon: IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 10),
+
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Le pilote pourra utiliser ce mot de passe pour sa première connexion.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _loading ? null : _create,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE30613),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                  ),
+                  child: _loading
+                      ? const SizedBox(
+                          width: 21,
+                          height: 21,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Créer le pilote',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================================================================
+// DETAIL PILOTE
+// ==================================================================
+
+class PilotDetailsPage extends StatefulWidget {
+  const PilotDetailsPage({super.key, required this.pilot});
+
+  final CompanyPilot pilot;
+
+  @override
+  State<PilotDetailsPage> createState() => _PilotDetailsPageState();
+}
+
+class _PilotDetailsPageState extends State<PilotDetailsPage> {
+  bool _loading = false;
+
+  Future<void> _deactivate() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Désactiver le pilote ?'),
+          content: Text(
+            '${widget.pilot.displayName} ne sera plus associé à l’entreprise.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE30613),
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Désactiver'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      await PilotsService.deactivatePilot(widget.pilot.id);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pilote désactivé.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      ManagementBackScope.maybeOf(context)?.onBack();
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: const Color(0xFFB91C1C),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pilot = widget.pilot;
+
+    return _ManagementSubPage(
+      title: 'Pilote',
+      icon: Icons.person_outline,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE4E4),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  pilot.initials,
+                  style: const TextStyle(
+                    color: Color(0xFFE30613),
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 14),
+
+              Text(
+                pilot.displayName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF222222),
+                ),
+              ),
+
+              const SizedBox(height: 5),
+
+              Text(
+                pilot.role,
+                style: const TextStyle(
+                  color: Color(0xFFE30613),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        _InfoCard(title: 'Adresse e-mail', value: pilot.email),
+
+        if (pilot.phone != null && pilot.phone!.trim().isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _InfoCard(title: 'Téléphone', value: pilot.phone!),
+        ],
+
+        if (pilot.joinedAt != null) ...[
+          const SizedBox(height: 12),
+          _InfoCard(
+            title: 'Membre depuis',
+            value: _formatDate(pilot.joinedAt!),
+          ),
+        ],
+
+        const SizedBox(height: 12),
+
+        _PilotCertificationsCard(
+          pilotId: pilot.id,
+          certifications: pilot.certifications,
+        ),
+
+        const SizedBox(height: 24),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _loading ? null : _deactivate,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFE30613),
+              side: const BorderSide(color: Color(0xFFE30613)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(13),
+              ),
+            ),
+            icon: _loading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.person_off_outlined),
+            label: Text(
+              _loading ? 'Désactivation...' : 'Désactiver le pilote',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================================================================
+// CHAMPS FORMULAIRE
+// ==================================================================
+
+class _AddCertificationDialog extends StatefulWidget {
+  const _AddCertificationDialog({required this.pilotId});
+
+  final String pilotId;
+
+  @override
+  State<_AddCertificationDialog> createState() =>
+      _AddCertificationDialogState();
+}
+
+class _AddCertificationDialogState extends State<_AddCertificationDialog> {
+  List<Map<String, dynamic>> _types = [];
+
+  String? _selectedCode;
+
+  DateTime? _obtainedAt;
+  DateTime? _expiresAt;
+
+  final _notesController = TextEditingController();
+
+  int _reminderDays = 90;
+
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTypes();
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadTypes() async {
+    try {
+      final types = await PilotsService.getCertificationTypes();
+
+      if (!mounted) return;
+
+      setState(() {
+        _types = types;
+        _selectedCode = types.isNotEmpty
+            ? types.first['code']?.toString()
+            : null;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _loading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  void _recalculateExpiration() {
+    if (_selectedCode == null || _obtainedAt == null) {
+      return;
+    }
+
+    Map<String, dynamic>? selectedType;
+
+    for (final type in _types) {
+      if (type['code']?.toString() == _selectedCode) {
+        selectedType = type;
+        break;
+      }
+    }
+
+    final validity = selectedType?['default_validity_days'];
+
+    if (validity is num) {
+      setState(() {
+        _expiresAt = DateTime(
+          _obtainedAt!.year,
+          _obtainedAt!.month,
+          _obtainedAt!.day,
+        ).add(Duration(days: validity.toInt()));
+      });
+    } else {
+      setState(() {
+        _expiresAt = null;
+      });
+    }
+  }
+
+  Future<void> _pickDate() async {
+    final initial = _obtainedAt ?? DateTime.now();
+
+    final date = await showDatePicker(
+      context: context,
+      locale: const Locale('fr', 'FR'),
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+
+    if (date == null || !mounted) return;
+
+    setState(() {
+      _obtainedAt = date;
+    });
+
+    _recalculateExpiration();
+  }
+
+  String _dateLabel(DateTime? date) {
+    if (date == null) {
+      return 'Sélectionner une date';
+    }
+
+    return _formatDate(date);
+  }
+
+  Future<void> _save() async {
+    if (_selectedCode == null) {
+      return;
+    }
+
+    if (_obtainedAt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La date d’obtention est obligatoire.')),
+      );
+      return;
+    }
+
+    if (_expiresAt != null && _expiresAt!.isBefore(_obtainedAt!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'La date d’expiration doit être après la date d’obtention.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+    });
+
+    try {
+      await PilotsService.createCertification(
+        pilotId: widget.pilotId,
+        code: _selectedCode!,
+        obtainedAt: _obtainedAt!,
+        expiresAt: _expiresAt,
+        reminderDays: _reminderDays,
+        notes: _notesController.text,
+      );
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop(true);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Certification enregistrée.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _saving = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        'Ajouter une certification',
+        style: TextStyle(fontWeight: FontWeight.w800),
+      ),
+      content: SizedBox(
+        width: 500,
+        child: _loading
+            ? const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            : SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedCode,
+                      decoration: const InputDecoration(
+                        labelText: 'Certification',
+                        prefixIcon: Icon(Icons.school_outlined),
+                      ),
+                      items: _types.map((type) {
+                        final code = type['code']?.toString() ?? '';
+
+                        final label = type['label']?.toString() ?? code;
+
+                        return DropdownMenuItem<String>(
+                          value: code,
+                          child: Text(label),
+                        );
+                      }).toList(),
+                      onChanged: _saving
+                          ? null
+                          : (value) {
+                              setState(() {
+                                _selectedCode = value;
+                              });
+
+                              _recalculateExpiration();
+                            },
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.event_outlined),
+                      title: const Text('Date d’obtention'),
+                      subtitle: Text(_dateLabel(_obtainedAt)),
+                      onTap: _saving ? null : _pickDate,
+                    ),
+
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.event_available_outlined),
+                      title: const Text('Date d’expiration'),
+                      subtitle: Text(
+                        _expiresAt == null
+                            ? 'Aucune date calculée'
+                            : '${_dateLabel(_expiresAt)}'
+                                  ' • calculée automatiquement',
+                      ),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    DropdownButtonFormField<int>(
+                      initialValue: _reminderDays,
+                      decoration: const InputDecoration(
+                        labelText: 'Rappel avant expiration',
+                        prefixIcon: Icon(Icons.notifications_none_outlined),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 30, child: Text('30 jours')),
+                        DropdownMenuItem(value: 60, child: Text('60 jours')),
+                        DropdownMenuItem(value: 90, child: Text('90 jours')),
+                        DropdownMenuItem(value: 180, child: Text('180 jours')),
+                      ],
+                      onChanged: _saving
+                          ? null
+                          : (value) {
+                              if (value == null) return;
+
+                              setState(() {
+                                _reminderDays = value;
+                              });
+                            },
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: _notesController,
+                      enabled: !_saving,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Notes',
+                        prefixIcon: Icon(Icons.notes_outlined),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _saving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Annuler'),
+        ),
+        FilledButton.icon(
+          onPressed: _saving || _loading ? null : _save,
+          icon: _saving
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.save_outlined),
+          label: Text(_saving ? 'Enregistrement...' : 'Enregistrer'),
+        ),
+      ],
+    );
+  }
+}
+
+class _PilotCertificationsCard extends StatefulWidget {
+  const _PilotCertificationsCard({
+    required this.pilotId,
+    required this.certifications,
+  });
+
+  final String pilotId;
+  final List<PilotCertification> certifications;
+
+  @override
+  State<_PilotCertificationsCard> createState() =>
+      _PilotCertificationsCardState();
+}
+
+class _PilotCertificationsCardState extends State<_PilotCertificationsCard> {
+  late List<PilotCertification> _certifications;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _certifications = List<PilotCertification>.from(widget.certifications);
+  }
+
+  Future<void> _reload() async {
+    if (_loading) return;
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      final certifications = await PilotsService.getCertifications(
+        widget.pilotId,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _certifications = certifications;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _loading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.school_outlined, color: Color(0xFFE30613)),
+              SizedBox(width: 10),
+              Text(
+                'Informations télépilote',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _loading
+                  ? null
+                  : () async {
+                      final saved = await showDialog<bool>(
+                        context: context,
+                        builder: (_) =>
+                            _AddCertificationDialog(pilotId: widget.pilotId),
+                      );
+
+                      if (saved == true && context.mounted) {
+                        await _reload();
+                      }
+                    },
+              icon: _loading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add),
+              label: Text(
+                _loading ? 'Actualisation...' : 'Ajouter une certification',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          if (_certifications.isEmpty)
+            const Text(
+              'Aucune certification enregistrée.',
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+            )
+          else
+            ..._certifications.map(
+              (certification) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _PilotCertificationTile(certification: certification),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// CHARGEMENT
+// ==================================================================
+
+class _PilotLoadingState extends StatelessWidget {
+  const _PilotLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.all(40),
+      child: Center(child: CircularProgressIndicator(color: Color(0xFFE30613))),
+    );
+  }
+}
+
+// ==================================================================
+// ERREUR
+// ==================================================================
+
+class _PilotErrorState extends StatelessWidget {
+  const _PilotErrorState({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline, color: Color(0xFFE30613), size: 46),
+
+          const SizedBox(height: 14),
+
+          const Text(
+            'Impossible de charger les pilotes',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+          ),
+
+          const SizedBox(height: 18),
+
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Réessayer'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// ÉTAT VIDE
+// ==================================================================
+
+class _EmptyPilotsState extends StatelessWidget {
+  const _EmptyPilotsState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.person_outline, size: 48, color: Color(0xFFE30613)),
+
+          const SizedBox(height: 14),
+
+          const Text(
+            'Aucun pilote',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+
+          const SizedBox(height: 7),
+
+          Text(
+            'Ajoutez le premier pilote de cette entreprise.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+          ),
+
+          const SizedBox(height: 18),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// SOUS-PAGE
+// ==================================================================
+
+class _ManagementSubPage extends StatelessWidget {
+  const _ManagementSubPage({
+    required this.title,
+    required this.icon,
+    required this.children,
+    this.actions,
+    this.scrollable = true,
+  });
+
+  final String title;
+  final IconData icon;
+  final List<Widget> children;
+  final List<Widget>? actions;
+  final bool scrollable;
+
+  @override
+  Widget build(BuildContext context) {
+    final backScope = ManagementBackScope.maybeOf(context);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF111111),
+        foregroundColor: Colors.white,
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
+
+        leading: backScope?.onBack == null
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: 'Retour à Gestion',
+                onPressed: backScope?.onBack,
+              ),
+
+        title: Text(
+          title,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+        ),
+
+        actions: actions,
+      ),
+
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 22),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 32,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: scrollable
+                ? ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                    children: children,
+                  )
+                : Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                    child: Column(
+                      children: [
+                        ...children.map((child) => Expanded(child: child)),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================================
+// INFO
+// ==================================================================
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({required this.title, required this.value});
+
+  final String title;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+
+          const SizedBox(height: 5),
+
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF222222),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ==================================================================
+
+const List<String> _droneClasses = <String>[
+  'C0',
+  'C1',
+  'C2',
+  'C3',
+  'C4',
+  'C5',
+  'C6',
+];
+
+String? _validateDroneSerialNumber(String? value) {
+  final serial = value?.trim().toUpperCase();
+
+  if (serial == null || serial.isEmpty) {
+    return 'Le numéro de série est obligatoire.';
+  }
+
+  if (!RegExp(r'^[A-Z0-9]{10,30}$').hasMatch(serial)) {
+    return '10 à 30 caractères alphanumériques.';
+  }
+
+  return null;
+}
+
+String? _validateDroneRegistrationNumber(String? value) {
+  final registration = value?.trim().toUpperCase();
+
+  if (registration == null || registration.isEmpty) {
+    return 'Le numéro d’enregistrement est obligatoire.';
+  }
+
+  if (!RegExp(r'^UAS-FR-[0-9]{6}$').hasMatch(registration)) {
+    return 'Format attendu : UAS-FR-XXXXXX.';
+  }
+
+  return null;
+}
+
+// DRONES
+// ==================================================================
+
+class _DroneHeader extends StatelessWidget {
+  const _DroneHeader({required this.count, required this.onAdd});
+
+  final int count;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Flotte de drones',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF222222),
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              Text(
+                count == 0
+                    ? 'Aucun drone'
+                    : '$count drone${count > 1 ? 's' : ''}',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        FilledButton.icon(
+          onPressed: onAdd,
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFE30613),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.flight_outlined, size: 19),
+          label: const Text(
+            'Ajouter',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class DronesPage extends StatefulWidget {
+  const DronesPage({super.key, required this.onOpenPage});
+
+  final ManagementPageOpener onOpenPage;
+
+  @override
+  State<DronesPage> createState() => _DronesPageState();
+}
+
+class _DronesPageState extends State<DronesPage> {
+  bool _loading = true;
+  bool _refreshing = false;
+
+  String? _error;
+
+  List<CompanyDrone> _drones = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDrones();
+  }
+
+  Future<void> _loadDrones() async {
+    if (!_refreshing) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    try {
+      final drones = await DronesService.getDrones();
+
+      if (!mounted) return;
+
+      setState(() {
+        _drones = drones;
+        _loading = false;
+        _refreshing = false;
+        _error = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _loading = false;
+        _refreshing = false;
+        _error = error.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _refresh() async {
+    if (_refreshing) return;
+
+    setState(() {
+      _refreshing = true;
+    });
+
+    await _loadDrones();
+  }
+
+  void _addDrone() {
+    widget.onOpenPage(
+      const CreateDronePage(),
+      onReturn: () {
+        _loadDrones();
+      },
+    );
+  }
+
+  void _openDrone(CompanyDrone drone) {
+    widget.onOpenPage(
+      EditDronePage(drone: drone),
+      onReturn: () {
+        _loadDrones();
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSubPage(
+      title: 'Drones',
+      icon: Icons.flight_outlined,
+      actions: [
+        IconButton(
+          tooltip: 'Actualiser',
+          onPressed: _refreshing ? null : _refresh,
+          icon: _refreshing
+              ? const SizedBox(
+                  width: 19,
+                  height: 19,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.refresh),
+        ),
+      ],
+      children: [
+        _DroneHeader(count: _drones.length, onAdd: _addDrone),
+
+        const SizedBox(height: 16),
+
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.all(40),
+            child: Center(
+              child: CircularProgressIndicator(color: Color(0xFFE30613)),
+            ),
+          )
+        else if (_error != null)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: Color(0xFFE30613),
+                  size: 44,
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Impossible de charger les drones',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: _loadDrones,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Réessayer'),
+                ),
+              ],
+            ),
+          )
+        else if (_drones.isEmpty)
+          _EmptyManagementState(
+            icon: Icons.flight_outlined,
+            title: 'Aucun drone',
+            message: 'Ajoutez le premier drone de cette entreprise.',
+          )
+        else
+          ..._drones.map(
+            (drone) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _DroneCard(drone: drone, onTap: () => _openDrone(drone)),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _DroneCard extends StatelessWidget {
+  const _DroneCard({required this.drone, required this.onTap});
+
+  final CompanyDrone drone;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE4E4),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.flight_outlined,
+                  color: Color(0xFFE30613),
+                  size: 28,
+                ),
+              ),
+
+              const SizedBox(width: 14),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      drone.displayName,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      drone.subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    Text(
+                      'N° série : ${drone.serialNumber}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+
+                    const SizedBox(height: 3),
+
+                    Text(
+                      'AlphaTango : ${drone.alphatangoAircraftNumber}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+
+                    if (drone.droneClass != null &&
+                        drone.droneClass!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        'Classe : ${drone.droneClass}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 8),
+
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: drone.isActive
+                            ? const Color(0xFFE8F5E9)
+                            : const Color(0xFFFFEBEE),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        drone.isActive ? 'Actif' : 'Inactif',
+                        style: TextStyle(
+                          color: drone.isActive
+                              ? const Color(0xFF2E7D32)
+                              : const Color(0xFFC62828),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 8),
+
+              const Icon(Icons.chevron_right, color: Color(0xFF777777)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class CreateDronePage extends StatefulWidget {
+  const CreateDronePage({super.key});
+
+  @override
+  State<CreateDronePage> createState() => _CreateDronePageState();
+}
+
+class _CreateDronePageState extends State<CreateDronePage> {
+  final _formKey = GlobalKey<FormState>();
+
+  final _nicknameController = TextEditingController();
+
+  final _manufacturerController = TextEditingController();
+
+  final _modelController = TextEditingController();
+
+  final _serialController = TextEditingController();
+
+  final _alphatangoController = TextEditingController();
+
+  final _classController = TextEditingController();
+
+  final _weightController = TextEditingController();
+
+  final _notesController = TextEditingController();
+
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    _manufacturerController.dispose();
+    _modelController.dispose();
+    _serialController.dispose();
+    _alphatangoController.dispose();
+    _classController.dispose();
+    _weightController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final weightText = _weightController.text.trim();
+
+    final weight = weightText.isEmpty ? null : int.tryParse(weightText);
+
+    if (weightText.isNotEmpty && weight == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Le poids doit être un nombre entier.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      await DronesService.createDrone(
+        nickname: _nicknameController.text,
+        manufacturer: _manufacturerController.text,
+        model: _modelController.text,
+        serialNumber: _serialController.text,
+        alphatangoAircraftNumber: _alphatangoController.text,
+        droneClass: _classController.text,
+        weightG: weight,
+        notes: _notesController.text,
+      );
+
+      if (!mounted) return;
+
+      ManagementBackScope.maybeOf(context)?.onBack();
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: const Color(0xFFB91C1C),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _DroneFormPage(
+      title: 'Ajouter un drone',
+      icon: Icons.add_circle_outline,
+      formKey: _formKey,
+      nicknameController: _nicknameController,
+      manufacturerController: _manufacturerController,
+      modelController: _modelController,
+      serialController: _serialController,
+      alphatangoController: _alphatangoController,
+      classController: _classController,
+      weightController: _weightController,
+      notesController: _notesController,
+      loading: _loading,
+      onSave: _save,
+      saveLabel: 'Ajouter le drone',
+    );
+  }
+}
+
+class EditDronePage extends StatefulWidget {
+  const EditDronePage({super.key, required this.drone});
+
+  final CompanyDrone drone;
+
+  @override
+  State<EditDronePage> createState() => _EditDronePageState();
+}
+
+class _EditDronePageState extends State<EditDronePage> {
+  final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _nicknameController;
+  late final TextEditingController _manufacturerController;
+  late final TextEditingController _modelController;
+  late final TextEditingController _serialController;
+  late final TextEditingController _alphatangoController;
+  late final TextEditingController _classController;
+  late final TextEditingController _weightController;
+  late final TextEditingController _notesController;
+
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _nicknameController = TextEditingController(
+      text: widget.drone.nickname ?? '',
+    );
+
+    _manufacturerController = TextEditingController(
+      text: widget.drone.manufacturer,
+    );
+
+    _modelController = TextEditingController(text: widget.drone.model);
+
+    _serialController = TextEditingController(text: widget.drone.serialNumber);
+
+    _alphatangoController = TextEditingController(
+      text: widget.drone.alphatangoAircraftNumber,
+    );
+
+    _classController = TextEditingController(
+      text: widget.drone.droneClass ?? '',
+    );
+
+    _weightController = TextEditingController(
+      text: widget.drone.weightG?.toString() ?? '',
+    );
+
+    _notesController = TextEditingController(text: widget.drone.notes ?? '');
+  }
+
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    _manufacturerController.dispose();
+    _modelController.dispose();
+    _serialController.dispose();
+    _alphatangoController.dispose();
+    _classController.dispose();
+    _weightController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final weightText = _weightController.text.trim();
+
+    final weight = weightText.isEmpty ? null : int.tryParse(weightText);
+
+    if (weightText.isNotEmpty && weight == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Le poids doit être un nombre entier.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      await DronesService.updateDrone(
+        droneId: widget.drone.id,
+        nickname: _nicknameController.text,
+        manufacturer: _manufacturerController.text,
+        model: _modelController.text,
+        serialNumber: _serialController.text,
+        alphatangoAircraftNumber: _alphatangoController.text,
+        droneClass: _classController.text,
+        weightG: weight,
+        notes: _notesController.text,
+      );
+
+      if (!mounted) return;
+
+      ManagementBackScope.maybeOf(context)?.onBack();
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: const Color(0xFFB91C1C),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deactivate() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Désactiver le drone ?'),
+          content: Text(
+            '${widget.drone.displayName} ne sera plus disponible dans la liste des drones actifs.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFE30613),
+              ),
+              child: const Text('Désactiver'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      await DronesService.deactivateDrone(widget.drone.id);
+
+      if (!mounted) return;
+
+      ManagementBackScope.maybeOf(context)?.onBack();
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: const Color(0xFFB91C1C),
+        ),
+      );
+
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _activate() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Réactiver le drone ?'),
+          content: Text(
+            '${widget.drone.displayName} redeviendra disponible pour les missions.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Réactiver'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      await DronesService.activateDrone(widget.drone.id);
+
+      if (!mounted) return;
+
+      ManagementBackScope.maybeOf(context)?.onBack();
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: const Color(0xFFB91C1C),
+        ),
+      );
+
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Supprimer définitivement le drone ?'),
+          content: Text(
+            '${widget.drone.displayName} sera supprimé de la gestion des drones.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFB91C1C),
+              ),
+              child: const Text('Supprimer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      await DronesService.deleteDrone(widget.drone.id);
+
+      if (!mounted) return;
+
+      ManagementBackScope.maybeOf(context)?.onBack();
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          backgroundColor: const Color(0xFFB91C1C),
+        ),
+      );
+
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _DroneFormPage(
+      title: 'Modifier le drone',
+      icon: Icons.edit_outlined,
+      formKey: _formKey,
+      nicknameController: _nicknameController,
+      manufacturerController: _manufacturerController,
+      modelController: _modelController,
+      serialController: _serialController,
+      alphatangoController: _alphatangoController,
+      classController: _classController,
+      weightController: _weightController,
+      notesController: _notesController,
+      loading: _loading,
+      onSave: _save,
+      saveLabel: 'Enregistrer',
+      extraAction: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          OutlinedButton.icon(
+            onPressed: _loading
+                ? null
+                : (widget.drone.isActive ? _deactivate : _activate),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFE30613),
+              side: const BorderSide(color: Color(0xFFE30613)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(13),
+              ),
+            ),
+            icon: Icon(
+              widget.drone.isActive
+                  ? Icons.flight_land_outlined
+                  : Icons.flight_takeoff_outlined,
+            ),
+            label: Text(
+              widget.drone.isActive
+                  ? 'Désactiver le drone'
+                  : 'Réactiver le drone',
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          OutlinedButton.icon(
+            onPressed: _loading ? null : _delete,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFB91C1C),
+              side: const BorderSide(color: Color(0xFFB91C1C)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(13),
+              ),
+            ),
+            icon: const Icon(Icons.delete_outline),
+            label: const Text(
+              'Supprimer définitivement',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DroneFormPage extends StatelessWidget {
+  const _DroneFormPage({
+    required this.title,
+    required this.icon,
+    required this.formKey,
+    required this.nicknameController,
+    required this.manufacturerController,
+    required this.modelController,
+    required this.serialController,
+    required this.alphatangoController,
+    required this.classController,
+    required this.weightController,
+    required this.notesController,
+    required this.loading,
+    required this.onSave,
+    required this.saveLabel,
+    this.extraAction,
+  });
+
+  final String title;
+  final IconData icon;
+  final GlobalKey<FormState> formKey;
+
+  final TextEditingController nicknameController;
+  final TextEditingController manufacturerController;
+  final TextEditingController modelController;
+  final TextEditingController serialController;
+  final TextEditingController alphatangoController;
+  final TextEditingController classController;
+  final TextEditingController weightController;
+  final TextEditingController notesController;
+
+  final bool loading;
+  final VoidCallback onSave;
+  final String saveLabel;
+  final Widget? extraAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSubPage(
+      title: title,
+      icon: icon,
+      children: [
+        Form(
+          key: formKey,
+          child: Column(
+            children: [
+              _FormField(
+                controller: nicknameController,
+                label: 'Nom / surnom',
+                icon: Icons.label_outline,
+                enabled: !loading,
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: manufacturerController,
+                label: 'Fabricant',
+                icon: Icons.business_outlined,
+                enabled: !loading,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Le fabricant est obligatoire.';
+                  }
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: modelController,
+                label: 'Modèle',
+                icon: Icons.flight_outlined,
+                enabled: !loading,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Le modèle est obligatoire.';
+                  }
+                  return null;
+                },
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: serialController,
+                label: 'Numéro de série',
+                icon: Icons.qr_code_2_outlined,
+                enabled: !loading,
+                validator: _validateDroneSerialNumber,
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: alphatangoController,
+                label: 'N° d’aéronef AlphaTango',
+                icon: Icons.confirmation_number_outlined,
+                enabled: !loading,
+                validator: _validateDroneRegistrationNumber,
+              ),
+
+              const SizedBox(height: 12),
+
+              DropdownButtonFormField<String>(
+                initialValue: classController.text.isEmpty
+                    ? null
+                    : classController.text.toUpperCase(),
+                decoration: _inputDecoration(
+                  label: 'Classe du drone',
+                  icon: Icons.category_outlined,
+                ),
+                items: _droneClasses
+                    .map(
+                      (value) => DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      ),
+                    )
+                    .toList(),
+                onChanged: loading
+                    ? null
+                    : (value) {
+                        classController.text = value ?? '';
+                      },
+              ),
+
+              const SizedBox(height: 12),
+
+              _FormField(
+                controller: weightController,
+                label: 'Poids (g)',
+                icon: Icons.scale_outlined,
+                keyboardType: TextInputType.number,
+                enabled: !loading,
+              ),
+
+              const SizedBox(height: 12),
+
+              TextFormField(
+                controller: notesController,
+                enabled: !loading,
+                maxLines: 4,
+                decoration: _inputDecoration(
+                  label: 'Notes',
+                  icon: Icons.notes_outlined,
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: loading ? null : onSave,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFE30613),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                  ),
+                  icon: loading
+                      ? const SizedBox(
+                          width: 19,
+                          height: 19,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: Text(
+                    loading ? 'Enregistrement...' : saveLabel,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+
+              if (extraAction != null) ...[
+                const SizedBox(height: 12),
+                SizedBox(width: double.infinity, child: extraAction!),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================================================================
+// DOCUMENTS
+// ==================================================================
+
+class DocumentsPage extends StatelessWidget {
+  const DocumentsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSubPage(
+      title: 'Documents',
+      icon: Icons.folder_outlined,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Documents',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF222222),
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Gestion des documents',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF777777)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: Center(
+            child: _EmptyManagementState(
+              icon: Icons.folder_outlined,
+              title: 'Aucun document chargé',
+              message: 'Les documents de l’entreprise seront affichés ici.',
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================================================================
+// PARAMÈTRES
+// ==================================================================
+
+class SettingsPage extends StatelessWidget {
+  const SettingsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSubPage(
+      title: 'Paramètres',
+      icon: Icons.settings_outlined,
+      children: [
+        _EmptyManagementState(
+          icon: Icons.settings_outlined,
+          title: 'Paramètres',
+          message: 'Les paramètres de l’application seront disponibles ici.',
+        ),
+      ],
+    );
+  }
+}
+
+// ==================================================================
+// ÉTAT VIDE AUTRES SECTIONS
+// ==================================================================
+
+class _EmptyManagementState extends StatelessWidget {
+  const _EmptyManagementState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 48, color: const Color(0xFFE30613)),
+
+          const SizedBox(height: 14),
+
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+          ),
+
+          const SizedBox(height: 7),
+
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatDate(DateTime date) {
+  final day = date.day.toString().padLeft(2, '0');
+
+  final month = date.month.toString().padLeft(2, '0');
+
+  return '$day/$month/${date.year}';
+}
+
+// ==================================================================
+// SITES
+// ==================================================================
+
+class _SiteHeader extends StatelessWidget {
+  const _SiteHeader({required this.count, required this.onAdd});
+
+  final int count;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Sites',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF222222),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                count == 0
+                    ? 'Aucun site'
+                    : '$count site${count > 1 ? 's' : ''}',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(width: 12),
+
+        FilledButton.icon(
+          onPressed: onAdd,
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFE30613),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.location_on_outlined, size: 19),
+          label: const Text(
+            'Ajouter',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class SitesPage extends StatefulWidget {
+  const SitesPage({super.key, required this.onOpenPage});
+
+  final ManagementPageOpener onOpenPage;
+
+  @override
+  State<SitesPage> createState() => _SitesPageState();
+}
+
+class _SitesPageState extends State<SitesPage> {
+  late Future<List<CompanySite>> _sitesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() {
+    _sitesFuture = SitesService.getSites();
+  }
+
+  Future<void> _refresh() async {
+    setState(_load);
+    try {
+      await _sitesFuture;
+    } catch (_) {}
+  }
+
+  void _addSite() {
+    widget.onOpenPage(
+      const _CreateSitePage(),
+      onReturn: () {
+        setState(_load);
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSubPage(
+      title: 'Sites',
+      scrollable: false,
+      icon: Icons.location_on_outlined,
+      actions: [
+        IconButton(
+          tooltip: 'Actualiser',
+          onPressed: _refresh,
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+      children: [
+        FutureBuilder<List<CompanySite>>(
+          future: _sitesFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline, size: 48),
+                      const SizedBox(height: 12),
+                      Text(
+                        snapshot.error?.toString().replaceFirst(
+                              'Exception: ',
+                              '',
+                            ) ??
+                            'Impossible de charger les sites.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: () => setState(_load),
+                        child: const Text('Réessayer'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            final sites = snapshot.data ?? [];
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _SiteHeader(count: sites.length, onAdd: _addSite),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: sites.isEmpty
+                      ? RefreshIndicator(
+                          onRefresh: _refresh,
+                          child: ListView(
+                            children: const [
+                              SizedBox(height: 140),
+                              Icon(
+                                Icons.location_on_outlined,
+                                size: 64,
+                                color: Color(0xFF777777),
+                              ),
+                              SizedBox(height: 16),
+                              Center(
+                                child: Text(
+                                  'Aucun site enregistré',
+                                  style: TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Center(
+                                child: Text(
+                                  'Ajoutez votre premier site d’intervention.',
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _refresh,
+                          child: ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                            itemCount: sites.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final site = sites[index];
+
+                              return Card(
+                                margin: EdgeInsets.zero,
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.all(16),
+                                  leading: Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFE4E4),
+                                      borderRadius: BorderRadius.circular(13),
+                                    ),
+                                    child: const Icon(
+                                      Icons.location_on_outlined,
+                                      color: Color(0xFFE30613),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    site.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  subtitle: Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (site.clientName != null)
+                                          Text('Client : ${site.clientName}'),
+                                        Text(
+                                          '${site.addressLine1}, '
+                                          '${site.postalCode} ${site.city}',
+                                        ),
+                                        if (site.prefectureName != null)
+                                          Text(
+                                            'Préfecture : '
+                                            '${site.prefectureName}',
+                                          ),
+                                        if (site.categoryLabel != null)
+                                          Text(
+                                            'Catégorie : '
+                                            '${site.categoryLabel}',
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                  trailing: IconButton(
+                                    tooltip: 'Modifier',
+                                    icon: const Icon(Icons.edit_outlined),
+                                    onPressed: () async {
+                                      final updated =
+                                          await Navigator.of(
+                                            context,
+                                          ).push<bool>(
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  _CreateSitePage(site: site),
+                                            ),
+                                          );
+
+                                      if (updated == true && mounted) {
+                                        setState(_load);
+                                      }
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _CreateSitePage extends StatefulWidget {
+  const _CreateSitePage({this.site});
+
+  final CompanySite? site;
+
+  @override
+  State<_CreateSitePage> createState() => _CreateSitePageState();
+}
+
+class _CreateSitePageState extends State<_CreateSitePage> {
+  final _formKey = GlobalKey<FormState>();
+
+  final _nameController = TextEditingController();
+  final _referenceController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _address2Controller = TextEditingController();
+  final _postalController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _latitudeController = TextEditingController();
+  final _longitudeController = TextEditingController();
+  final _notesController = TextEditingController();
+
+  List<CompanyClient> _clients = [];
+  List<Map<String, dynamic>> _prefectures = [];
+
+  CompanyClient? _client;
+  Map<String, dynamic>? _prefecture;
+
+  bool _loading = true;
+  bool _saving = false;
+  bool _favorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final site = widget.site;
+
+    if (site != null) {
+      _nameController.text = site.name;
+      _referenceController.text = site.siteReference ?? '';
+      _descriptionController.text = site.description ?? '';
+      _addressController.text = site.addressLine1;
+      _address2Controller.text = site.addressLine2 ?? '';
+      _postalController.text = site.postalCode;
+      _cityController.text = site.city;
+      _latitudeController.text = site.latitude?.toString() ?? '';
+      _longitudeController.text = site.longitude?.toString() ?? '';
+      _notesController.text = site.notes ?? '';
+      _favorite = site.isFavorite;
+    }
+
+    _loadReferences();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _referenceController.dispose();
+    _descriptionController.dispose();
+    _addressController.dispose();
+    _address2Controller.dispose();
+    _postalController.dispose();
+    _cityController.dispose();
+    _latitudeController.dispose();
+    _longitudeController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadReferences() async {
+    try {
+      final results = await Future.wait([
+        ClientsService.getClients(),
+        MissionsService.getReferences(),
+      ]);
+
+      final references = results[1] as MissionReferenceData;
+
+      if (!mounted) return;
+
+      final clients = results[0] as List<CompanyClient>;
+
+      CompanyClient? selectedClient;
+      Map<String, dynamic>? selectedPrefecture;
+
+      final site = widget.site;
+
+      if (site != null) {
+        for (final client in clients) {
+          if (client.id == site.clientId) {
+            selectedClient = client;
+            break;
+          }
+        }
+
+        for (final prefecture in references.prefectures) {
+          if (prefecture['id']?.toString() == site.prefectureId) {
+            selectedPrefecture = prefecture;
+            break;
+          }
+        }
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _clients = clients;
+        _prefectures = references.prefectures;
+        _client = selectedClient;
+        _prefecture = selectedPrefecture;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _loading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Future<void> _createClient() async {
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final phoneController = TextEditingController();
+
+    final result = await showDialog<CompanyClient>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Nouveau client'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Nom du client *',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'E-mail',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Téléphone',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final name = nameController.text.trim();
+
+                if (name.isEmpty) return;
+
+                try {
+                  final client = await ClientsService.createClient(
+                    name: name,
+                    email: emailController.text.trim().isEmpty
+                        ? null
+                        : emailController.text.trim(),
+                    phone: phoneController.text.trim().isEmpty
+                        ? null
+                        : phoneController.text.trim(),
+                  );
+
+                  if (context.mounted) {
+                    Navigator.pop(context, client);
+                  }
+                } catch (e) {
+                  if (!context.mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        e.toString().replaceFirst('Exception: ', ''),
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Créer'),
+            ),
+          ],
+        );
+      },
+    );
+
+    nameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _clients = [..._clients, result];
+      _client = result;
+    });
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    double? latitude;
+    double? longitude;
+
+    if (_latitudeController.text.trim().isNotEmpty) {
+      latitude = double.tryParse(
+        _latitudeController.text.trim().replaceAll(',', '.'),
+      );
+
+      if (latitude == null) {
+        _showError('Latitude invalide.');
+        return;
+      }
+    }
+
+    if (_longitudeController.text.trim().isNotEmpty) {
+      longitude = double.tryParse(
+        _longitudeController.text.trim().replaceAll(',', '.'),
+      );
+
+      if (longitude == null) {
+        _showError('Longitude invalide.');
+        return;
+      }
+    }
+
+    setState(() => _saving = true);
+
+    try {
+      final site = widget.site;
+
+      final siteReference = _referenceController.text.trim().isEmpty
+          ? null
+          : _referenceController.text.trim();
+
+      final description = _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim();
+
+      final addressLine2 = _address2Controller.text.trim().isEmpty
+          ? null
+          : _address2Controller.text.trim();
+
+      final notes = _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim();
+
+      if (site == null) {
+        await SitesService.createSite(
+          name: _nameController.text.trim(),
+          siteReference: siteReference,
+          description: description,
+          clientId: _client?.id,
+          addressLine1: _addressController.text.trim(),
+          addressLine2: addressLine2,
+          postalCode: _postalController.text.trim(),
+          city: _cityController.text.trim(),
+          latitude: latitude,
+          longitude: longitude,
+          prefectureId: _prefecture?['id']?.toString(),
+          isFavorite: _favorite,
+          notes: notes,
+        );
+      } else {
+        await SitesService.updateSite(
+          siteId: site.id,
+          name: _nameController.text.trim(),
+          siteReference: siteReference,
+          description: description,
+          clientId: _client?.id,
+          addressLine1: _addressController.text.trim(),
+          addressLine2: addressLine2,
+          postalCode: _postalController.text.trim(),
+          city: _cityController.text.trim(),
+          latitude: latitude,
+          longitude: longitude,
+          prefectureId: _prefecture?['id']?.toString(),
+          isFavorite: _favorite,
+          notes: notes,
+        );
+      }
+
+      if (!mounted) return;
+
+      ManagementBackScope.maybeOf(context)?.onBack();
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _saving = false);
+
+      _showError(e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  InputDecoration _decoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      border: const OutlineInputBorder(),
+    );
+  }
+
+  String _prefectureLabel(Map<String, dynamic> prefecture) {
+    final name = prefecture['prefecture_name']?.toString();
+
+    final code = prefecture['code']?.toString();
+
+    if (name != null && name.isNotEmpty) {
+      if (code != null && code.isNotEmpty) {
+        return '$code — $name';
+      }
+      return name;
+    }
+
+    return prefecture['city']?.toString() ?? '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSubPage(
+      title: widget.site == null ? 'Nouveau site' : 'Modifier le site',
+      icon: Icons.location_on_outlined,
+      scrollable: false,
+      children: [
+        _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 30),
+                  children: [
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: _decoration('Nom du site'),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Le nom du site est obligatoire.';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: _referenceController,
+                      decoration: _decoration('Référence du site'),
+                    ),
+                    const SizedBox(height: 14),
+
+                    DropdownButtonFormField<CompanyClient>(
+                      initialValue: _client,
+                      decoration: _decoration('Client'),
+                      items: [
+                        const DropdownMenuItem<CompanyClient>(
+                          value: null,
+                          child: Text('Aucun client'),
+                        ),
+                        ..._clients.map(
+                          (client) => DropdownMenuItem(
+                            value: client,
+                            child: Text(client.name),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _client = value);
+                      },
+                    ),
+
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: _createClient,
+                        icon: const Icon(Icons.person_add_outlined),
+                        label: const Text('Ajouter nouveau client'),
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    const SizedBox(height: 20),
+
+                    const Text(
+                      'Adresse du site',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    TextFormField(
+                      controller: _addressController,
+                      decoration: _decoration('Adresse'),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'L’adresse est obligatoire.';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: _address2Controller,
+                      decoration: _decoration('Complément'),
+                    ),
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: _postalController,
+                      decoration: _decoration('Code postal'),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Le code postal est obligatoire.';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: _cityController,
+                      decoration: _decoration('Ville'),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'La ville est obligatoire.';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    DropdownButtonFormField<Map<String, dynamic>>(
+                      initialValue: _prefecture,
+                      decoration: _decoration('Préfecture'),
+                      items: [
+                        const DropdownMenuItem<Map<String, dynamic>>(
+                          value: null,
+                          child: Text('Aucune préfecture'),
+                        ),
+                        ..._prefectures.map(
+                          (prefecture) => DropdownMenuItem(
+                            value: prefecture,
+                            child: Text(_prefectureLabel(prefecture)),
+                          ),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        setState(() => _prefecture = value);
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    const Text(
+                      'Coordonnées GPS',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _latitudeController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                            decoration: _decoration('Latitude'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _longitudeController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                              signed: true,
+                            ),
+                            decoration: _decoration('Longitude'),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        'Site favori',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      subtitle: Text('Mettre ce site en évidence'),
+                      value: _favorite,
+                      onChanged: (value) {
+                        setState(() => _favorite = value);
+                      },
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: _descriptionController,
+                      maxLines: 3,
+                      decoration: _decoration('Description'),
+                    ),
+
+                    const SizedBox(height: 14),
+
+                    TextFormField(
+                      controller: _notesController,
+                      maxLines: 4,
+                      decoration: _decoration('Notes'),
+                    ),
+
+                    const SizedBox(height: 24),
+
+                    SizedBox(
+                      height: 50,
+                      child: FilledButton.icon(
+                        onPressed: _saving ? null : _save,
+                        icon: _saving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.save_outlined),
+                        label: Text(
+                          _saving
+                              ? 'Enregistrement...'
+                              : widget.site == null
+                              ? 'Créer le site'
+                              : 'Enregistrer les modifications',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+      ],
+    );
+  }
+}
+
+// ==================================================================
+// CATÉGORIES DE MISSION
+// ==================================================================
+
+class _CategoryHeader extends StatelessWidget {
+  const _CategoryHeader({required this.count, required this.onAdd});
+
+  final int count;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Catégories',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF222222),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                count == 0
+                    ? 'Aucune catégorie'
+                    : '$count catégorie${count > 1 ? 's' : ''}',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        FilledButton.icon(
+          onPressed: onAdd,
+          style: FilledButton.styleFrom(
+            backgroundColor: const Color(0xFFE30613),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          icon: const Icon(Icons.category_outlined, size: 19),
+          label: const Text(
+            'Ajouter',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class MissionCategoriesPage extends StatefulWidget {
+  const MissionCategoriesPage({super.key});
+
+  @override
+  State<MissionCategoriesPage> createState() => _MissionCategoriesPageState();
+}
+
+class _MissionCategoriesPageState extends State<MissionCategoriesPage> {
+  bool _loading = true;
+  String? _error;
+
+  List<MissionCategory> _categories = [];
+  List<CompanyDrone> _drones = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final results = await Future.wait([
+        MissionCategoriesService.getCategories(),
+        DronesService.getDrones(),
+      ]);
+
+      if (!mounted) return;
+
+      setState(() {
+        _categories = results[0] as List<MissionCategory>;
+
+        _drones = (results[1] as List<CompanyDrone>)
+            .where((drone) => drone.isActive)
+            .toList();
+
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _openCategoryDialog({MissionCategory? category}) async {
+    final codeController = TextEditingController(text: category?.code ?? '');
+
+    final labelController = TextEditingController(text: category?.label ?? '');
+
+    final descriptionController = TextEditingController(
+      text: category?.description ?? '',
+    );
+
+    final isEditing = category != null;
+
+    String? selectedDroneId = category?.defaultDroneId;
+
+    if (selectedDroneId != null &&
+        !_drones.any((drone) => drone.id == selectedDroneId)) {
+      selectedDroneId = null;
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        bool saving = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text(
+                isEditing ? 'Modifier la catégorie' : 'Nouvelle catégorie',
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: codeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Code',
+                        hintText: 'inspection',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: labelController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nom',
+                        hintText: 'Inspection',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    DropdownButtonFormField<String?>(
+                      initialValue: selectedDroneId,
+                      decoration: const InputDecoration(
+                        labelText: 'Drone par défaut',
+                        prefixIcon: Icon(Icons.flight),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Aucun drone par défaut'),
+                        ),
+                        ..._drones.map(
+                          (drone) => DropdownMenuItem<String?>(
+                            value: drone.id,
+                            child: Text(drone.displayName),
+                          ),
+                        ),
+                      ],
+                      onChanged: saving
+                          ? null
+                          : (value) {
+                              setDialogState(() {
+                                selectedDroneId = value;
+                              });
+                            },
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    TextField(
+                      controller: descriptionController,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: saving
+                      ? null
+                      : () => Navigator.pop(dialogContext, false),
+                  child: const Text('Annuler'),
+                ),
+                FilledButton(
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          final code = codeController.text.trim();
+
+                          final label = labelController.text.trim();
+
+                          if (code.isEmpty || label.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Le code et le nom sont obligatoires.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          setDialogState(() => saving = true);
+
+                          try {
+                            final description = descriptionController.text
+                                .trim();
+
+                            if (isEditing) {
+                              await MissionCategoriesService.updateCategory(
+                                categoryId: category.id,
+                                code: code,
+                                label: label,
+                                description: description.isEmpty
+                                    ? null
+                                    : description,
+                                sortOrder: category.sortOrder,
+                                defaultDroneId: selectedDroneId,
+                              );
+                            } else {
+                              await MissionCategoriesService.createCategory(
+                                code: code,
+                                label: label,
+                                description: description.isEmpty
+                                    ? null
+                                    : description,
+                                defaultDroneId: selectedDroneId,
+                              );
+                            }
+
+                            if (dialogContext.mounted) {
+                              Navigator.pop(dialogContext, true);
+                            }
+                          } catch (error) {
+                            if (!context.mounted) {
+                              return;
+                            }
+
+                            setDialogState(() => saving = false);
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  error.toString().replaceFirst(
+                                    'Exception: ',
+                                    '',
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                  child: Text(
+                    saving
+                        ? 'Enregistrement...'
+                        : isEditing
+                        ? 'Enregistrer'
+                        : 'Créer',
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    codeController.dispose();
+    labelController.dispose();
+    descriptionController.dispose();
+
+    if (result == true) {
+      _load();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSubPage(
+      title: 'Catégories',
+      scrollable: false,
+      icon: Icons.category_outlined,
+      actions: [
+        IconButton(
+          tooltip: 'Actualiser',
+          onPressed: _load,
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+      children: [_buildBody()],
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: _load, child: const Text('Réessayer')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _CategoryHeader(count: _categories.length, onAdd: _openCategoryDialog),
+        const SizedBox(height: 16),
+        Expanded(
+          child: _categories.isEmpty
+              ? RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView(
+                    children: const [
+                      SizedBox(height: 140),
+                      Icon(
+                        Icons.category_outlined,
+                        size: 64,
+                        color: Color(0xFF777777),
+                      ),
+                      SizedBox(height: 16),
+                      Center(
+                        child: Text(
+                          'Aucune catégorie',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Center(child: Text('Ajoutez votre première catégorie.')),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+                    itemCount: _categories.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final category = _categories[index];
+
+                      final droneName = category.defaultDroneName;
+
+                      return Card(
+                        child: ListTile(
+                          leading: const CircleAvatar(
+                            child: Icon(Icons.category_outlined),
+                          ),
+                          title: Text(
+                            category.label,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          subtitle: Text(
+                            '${category.code}\n'
+                            '${category.description ?? 'Aucune description'}\n'
+                            'Drone par défaut : '
+                            '${droneName ?? 'Aucun'}',
+                          ),
+                          isThreeLine: true,
+                          trailing: IconButton(
+                            tooltip: 'Modifier',
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: () =>
+                                _openCategoryDialog(category: category),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
