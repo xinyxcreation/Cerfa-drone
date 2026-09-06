@@ -7,3 +7,7 @@ dist/
 .admin-token
 .pilot-token
 .moderator-token
+
+*.bak-*
+
+*.bak

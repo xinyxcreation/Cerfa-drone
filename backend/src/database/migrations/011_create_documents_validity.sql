@@ -13,6 +13,12 @@ CREATE TABLE documents_validity (
 
     reminder_days SMALLINT UNSIGNED NULL,
 
+    file_original_name VARCHAR(255) NULL,
+    file_stored_name VARCHAR(255) NULL,
+    file_storage_path VARCHAR(500) NULL,
+    file_mime_type VARCHAR(100) NULL,
+    file_size BIGINT UNSIGNED NULL,
+
     is_valid BOOLEAN NOT NULL DEFAULT TRUE,
 
     notes TEXT NULL,
