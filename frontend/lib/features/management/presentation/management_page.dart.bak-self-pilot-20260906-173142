@@ -1594,39 +1594,6 @@ class _CreatePilotPageState extends State<CreatePilotPage> {
   bool _obscurePassword = true;
   bool _loading = false;
   bool _isSelfPilot = false;
-  bool _alreadyPilot = false;
-  bool _checkingPilot = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkIfAlreadyPilot();
-  }
-
-  Future<void> _checkIfAlreadyPilot() async {
-    try {
-      final pilots = await PilotsService.getPilots();
-
-      final currentEmail = widget.user.email.trim().toLowerCase();
-
-      final alreadyPilot = pilots.any(
-        (pilot) => pilot.email.trim().toLowerCase() == currentEmail,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _alreadyPilot = alreadyPilot;
-        _checkingPilot = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _checkingPilot = false;
-      });
-    }
-  }
 
   @override
   void dispose() {
@@ -1711,9 +1678,7 @@ class _CreatePilotPageState extends State<CreatePilotPage> {
           key: _formKey,
           child: Column(
             children: [
-              if (!_checkingPilot &&
-                  !widget.user.isPilot &&
-                  !_alreadyPilot) ...[
+              if (!widget.user.isPilot) ...[
                 Card(
                   margin: EdgeInsets.zero,
                   child: CheckboxListTile(

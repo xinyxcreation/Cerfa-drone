@@ -486,6 +486,16 @@ export class CompanyPilotController {
             pilotId: string;
         };
 
+        if (
+            params.pilotId ===
+            payload.sub
+        ) {
+
+            throw new AuthorizationError(
+                'Utilisez votre propre statut pilote pour modifier votre statut.'
+            );
+        }
+
         await this.service.deactivate(
             payload.company_id,
             payload.role,
