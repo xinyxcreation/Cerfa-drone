@@ -125,6 +125,9 @@ export class CompanyPilotController {
                     is_pilot:
                     pilot.is_pilot,
 
+                    is_pilot_active:
+                    pilot.is_pilot_active,
+
                     certifications:
                     certifications.map(certification => ({
                         id:
@@ -462,6 +465,47 @@ export class CompanyPilotController {
     // DÉSACTIVER UN AUTRE PILOTE
     // ============================================================
 
+    public async deactivate(
+        request: FastifyRequest,
+        reply: FastifyReply
+    ): Promise<void> {
+
+        const payload =
+        await request.jwtVerify<AuthPayload>();
+
+        if (!payload.company_id) {
+
+            throw new AuthorizationError(
+                'Entreprise introuvable dans la session.'
+            );
+        }
+
+        this.checkManagementAccess(
+            payload.role
+        );
+
+        const params =
+        request.params as {
+            pilotId: string;
+        };
+
+        await this.service.deactivate(
+            payload.company_id,
+            payload.role,
+            params.pilotId
+        );
+
+        reply.send({
+
+            success: true
+
+        });
+    }
+
+    // ============================================================
+    // RÉACTIVER UN PILOTE
+    // ============================================================
+
     public async reactivate(
         request: FastifyRequest,
         reply: FastifyReply
@@ -499,41 +543,3 @@ export class CompanyPilotController {
         });
     }
 
-
-    public async deactivate(
-        request: FastifyRequest,
-        reply: FastifyReply
-    ): Promise<void> {
-
-        const payload =
-        await request.jwtVerify<AuthPayload>();
-
-        if (!payload.company_id) {
-
-            throw new AuthorizationError(
-                'Entreprise introuvable dans la session.'
-            );
-        }
-
-        this.checkManagementAccess(
-            payload.role
-        );
-
-        const params =
-        request.params as {
-            pilotId: string;
-        };
-
-        await this.service.deactivate(
-            payload.company_id,
-            payload.role,
-            params.pilotId
-        );
-
-        reply.send({
-
-            success: true
-
-        });
-    }
-}

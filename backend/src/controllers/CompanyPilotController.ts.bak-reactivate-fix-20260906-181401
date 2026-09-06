@@ -462,44 +462,6 @@ export class CompanyPilotController {
     // DÉSACTIVER UN AUTRE PILOTE
     // ============================================================
 
-    public async reactivate(
-        request: FastifyRequest,
-        reply: FastifyReply
-    ): Promise<void> {
-
-        const payload =
-        await request.jwtVerify<AuthPayload>();
-
-        if (!payload.company_id) {
-
-            throw new AuthorizationError(
-                'Entreprise introuvable dans la session.'
-            );
-        }
-
-        this.checkManagementAccess(
-            payload.role
-        );
-
-        const params =
-        request.params as {
-            pilotId: string;
-        };
-
-        await this.service.reactivate(
-            payload.company_id,
-            payload.role,
-            params.pilotId
-        );
-
-        reply.send({
-
-            success: true
-
-        });
-    }
-
-
     public async deactivate(
         request: FastifyRequest,
         reply: FastifyReply

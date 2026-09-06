@@ -344,63 +344,6 @@ export class CompanyPilotService {
     // DÉSACTIVER LE STATUT PILOTE
     // ============================================================
 
-    public async reactivate(
-        companyId: string,
-        requesterRole: string,
-        pilotId: string
-    ): Promise<void> {
-
-        if (
-            requesterRole !== 'OWNER' &&
-            requesterRole !== 'MANAGER'
-        ) {
-            throw new AuthorizationError(
-                'Vous n’avez pas l’autorisation de réactiver un pilote.'
-            );
-        }
-
-        const company =
-        await this.companies.findById(
-            companyId
-        );
-
-        if (!company) {
-            throw new NotFoundError(
-                'Entreprise introuvable.'
-            );
-        }
-
-        if (!company.is_active) {
-            throw new AuthorizationError(
-                'Entreprise désactivée.'
-            );
-        }
-
-        const membership =
-        await this.companyUsers
-        .findByCompanyAndUser(
-            companyId,
-            pilotId
-        );
-
-        if (!membership) {
-            throw new NotFoundError(
-                'Utilisateur introuvable dans cette entreprise.'
-            );
-        }
-
-        if (!membership.is_pilot) {
-            throw new NotFoundError(
-                'Cet utilisateur n’est pas pilote dans cette entreprise.'
-            );
-        }
-
-        await this.companyUsers.reactivatePilot(
-            companyId,
-            pilotId
-        );
-    }
-
     public async deactivate(
         companyId: string,
         requesterRole: string,

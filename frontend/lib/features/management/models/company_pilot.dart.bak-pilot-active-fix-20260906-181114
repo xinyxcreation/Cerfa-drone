@@ -84,7 +84,6 @@ class CompanyPilot {
     required this.joinedAt,
     required this.role,
     required this.certifications,
-    required this.isActive,
   });
 
   final String id;
@@ -98,7 +97,6 @@ class CompanyPilot {
   final DateTime? joinedAt;
   final String role;
   final List<PilotCertification> certifications;
-  final bool isActive;
 
   factory CompanyPilot.fromJson(Map<String, dynamic> json) {
     final certificationData = json['certifications'] as List<dynamic>? ?? [];
@@ -115,11 +113,6 @@ class CompanyPilot {
           ? DateTime.tryParse(json['joined_at'].toString())
           : null,
       role: json['role']?.toString().toUpperCase() ?? 'PILOT',
-      isActive:
-          json['is_pilot_active'] == true ||
-          json['is_pilot_active'] == 1 ||
-          json['is_pilot_active']?.toString().toLowerCase() == 'true' ||
-          json['is_pilot_active']?.toString() == '1',
       certifications: certificationData
           .map(
             (item) => PilotCertification.fromJson(

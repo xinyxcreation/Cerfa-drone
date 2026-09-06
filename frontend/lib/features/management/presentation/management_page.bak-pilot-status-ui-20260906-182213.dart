@@ -1484,8 +1484,6 @@ class _PilotCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isActive = pilot.isActive;
-
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
@@ -1500,18 +1498,14 @@ class _PilotCard extends StatelessWidget {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: isActive
-                      ? const Color(0xFFFFE4E4)
-                      : const Color(0xFFF1F1F1),
+                  color: const Color(0xFFFFE4E4),
                   borderRadius: BorderRadius.circular(15),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   pilot.initials,
-                  style: TextStyle(
-                    color: isActive
-                        ? const Color(0xFFE30613)
-                        : const Color(0xFF777777),
+                  style: const TextStyle(
+                    color: Color(0xFFE30613),
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1556,31 +1550,6 @@ class _PilotCard extends StatelessWidget {
                         ),
                       ),
                     ],
-
-                    const SizedBox(height: 7),
-
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isActive
-                            ? const Color(0xFFE8F5E9)
-                            : const Color(0xFFF1F1F1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        isActive ? 'Actif' : 'Inactif',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: isActive
-                              ? const Color(0xFF2E7D32)
-                              : const Color(0xFF777777),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -1956,8 +1925,7 @@ class _PilotDetailsPageState extends State<PilotDetailsPage> {
         return AlertDialog(
           title: const Text('Désactiver le pilote ?'),
           content: Text(
-            '${widget.pilot.displayName} sera désactivé comme pilote de l’entreprise. '
-            'Il restera présent dans la liste et pourra être réactivé.',
+            '${widget.pilot.displayName} ne sera plus associé à l’entreprise.',
           ),
           actions: [
             TextButton(
@@ -1992,69 +1960,6 @@ class _PilotDetailsPageState extends State<PilotDetailsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Pilote désactivé.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-
-      ManagementBackScope.maybeOf(context)?.onBack();
-    } catch (error) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
-          backgroundColor: const Color(0xFFB91C1C),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _reactivate() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Réactiver le pilote ?'),
-          content: Text(
-            '${widget.pilot.displayName} redeviendra pilote actif de l’entreprise.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Annuler'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Réactiver'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true) {
-      return;
-    }
-
-    setState(() {
-      _loading = true;
-    });
-
-    try {
-      await PilotsService.reactivatePilot(widget.pilot.id);
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pilote réactivé.'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -2168,18 +2073,10 @@ class _PilotDetailsPageState extends State<PilotDetailsPage> {
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: _loading
-                ? null
-                : (pilot.isActive ? _deactivate : _reactivate),
+            onPressed: _loading ? null : _deactivate,
             style: OutlinedButton.styleFrom(
-              foregroundColor: pilot.isActive
-                  ? const Color(0xFFE30613)
-                  : const Color(0xFF2E7D32),
-              side: BorderSide(
-                color: pilot.isActive
-                    ? const Color(0xFFE30613)
-                    : const Color(0xFF2E7D32),
-              ),
+              foregroundColor: const Color(0xFFE30613),
+              side: const BorderSide(color: Color(0xFFE30613)),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(13),
@@ -2191,17 +2088,9 @@ class _PilotDetailsPageState extends State<PilotDetailsPage> {
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Icon(
-                    pilot.isActive
-                        ? Icons.person_off_outlined
-                        : Icons.person_add_alt_1_outlined,
-                  ),
+                : const Icon(Icons.person_off_outlined),
             label: Text(
-              _loading
-                  ? (pilot.isActive ? 'Désactivation...' : 'Réactivation...')
-                  : (pilot.isActive
-                        ? 'Désactiver le pilote'
-                        : 'Réactiver le pilote'),
+              _loading ? 'Désactivation...' : 'Désactiver le pilote',
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),

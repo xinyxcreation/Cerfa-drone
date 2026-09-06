@@ -161,19 +161,6 @@ class PilotsService {
     }
   }
 
-  static Future<void> reactivatePilot(String pilotId) async {
-    try {
-      await ApiClient.instance.patch(
-        '/auth/company/pilots/$pilotId/activate',
-        data: {},
-      );
-    } on DioException catch (error) {
-      throw Exception(
-        _messageFromError(error, 'Impossible de réactiver le pilote.'),
-      );
-    }
-  }
-
   static Future<void> deactivatePilot(String pilotId) async {
     try {
       await ApiClient.instance.delete('/auth/company/pilots/$pilotId');

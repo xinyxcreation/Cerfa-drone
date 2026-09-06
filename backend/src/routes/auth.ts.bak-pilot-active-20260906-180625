@@ -288,18 +288,6 @@ export default async function authRoutes(
         )
     );
 
-    app.patch(
-        '/company/pilots/:pilotId/activate',
-        {
-            preHandler: async request => {
-                await request.jwtVerify();
-            }
-        },
-        pilotController.reactivate.bind(
-            pilotController
-        )
-    );
-
     // ============================================================
     // SITES
     // ============================================================

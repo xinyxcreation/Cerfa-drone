@@ -10,7 +10,6 @@ export interface CompanyUser extends RowDataPacket {
     role_id: string;
 
     is_pilot: boolean;
-    is_pilot_active: boolean;
     is_active: boolean;
 
     joined_at: Date;
@@ -39,7 +38,6 @@ export interface CompanyMember extends RowDataPacket {
     role_label: string;
 
     is_pilot: boolean;
-    is_pilot_active: boolean;
     company_name: string;
 }
 
@@ -169,7 +167,6 @@ export class CompanyUserRepository extends BaseRepository {
             FROM company_users
             WHERE company_id = ?
             AND is_pilot = TRUE
-            AND is_pilot_active = TRUE
             AND is_active = TRUE
             AND deleted_at IS NULL
             `,
@@ -202,8 +199,7 @@ export class CompanyUserRepository extends BaseRepository {
                     r.code AS role_code,
                     r.label AS role_label,
 
-                    cu.is_pilot,
-                    cu.is_pilot_active
+                    cu.is_pilot
 
                 FROM company_users cu
 
@@ -254,7 +250,6 @@ export class CompanyUserRepository extends BaseRepository {
                 user_id: userId,
                 role_id: roleId,
                 is_pilot: isPilot,
-                is_pilot_active: isPilot,
                 is_active: true,
                 joined_at: new Date(),
                 left_at: null
@@ -284,8 +279,7 @@ export class CompanyUserRepository extends BaseRepository {
             this.table,
             membership.id,
             {
-                is_pilot: isPilot,
-                is_pilot_active: isPilot
+                is_pilot: isPilot
             }
         );
     }
@@ -311,34 +305,7 @@ export class CompanyUserRepository extends BaseRepository {
             this.table,
             membership.id,
             {
-                is_pilot_active: false
-            }
-        );
-    }
-
-    public async reactivatePilot(
-        companyId: string,
-        userId: string
-    ): Promise<void> {
-
-        const membership =
-        await this.findByCompanyAndUser(
-            companyId,
-            userId
-        );
-
-        if (!membership) {
-            throw new Error(
-                'Utilisateur non associé à cette entreprise.'
-            );
-        }
-
-        await this.baseUpdate(
-            this.table,
-            membership.id,
-            {
-                is_pilot: true,
-                is_pilot_active: true
+                is_pilot: false
             }
         );
     }
@@ -352,7 +319,7 @@ export class CompanyUserRepository extends BaseRepository {
             id,
             {
                 is_active: false,
-                is_pilot_active: false,
+                is_pilot: false,
                 left_at: new Date()
             }
         );

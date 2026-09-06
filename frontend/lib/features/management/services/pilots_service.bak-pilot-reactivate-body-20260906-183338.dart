@@ -163,10 +163,7 @@ class PilotsService {
 
   static Future<void> reactivatePilot(String pilotId) async {
     try {
-      await ApiClient.instance.patch(
-        '/auth/company/pilots/$pilotId/activate',
-        data: {},
-      );
+      await ApiClient.instance.patch('/auth/company/pilots/$pilotId/activate');
     } on DioException catch (error) {
       throw Exception(
         _messageFromError(error, 'Impossible de réactiver le pilote.'),

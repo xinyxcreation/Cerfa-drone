@@ -23,7 +23,9 @@ class PilotCertification {
   final bool isValid;
   final String? notes;
 
-  factory PilotCertification.fromJson(Map<String, dynamic> json) {
+  factory PilotCertification.fromJson(
+    Map<String, dynamic> json,
+  ) {
     return PilotCertification(
       id: json['id']?.toString() ?? '',
       code: json['code']?.toString() ?? '',
@@ -31,20 +33,25 @@ class PilotCertification {
       description: json['description']?.toString(),
       reference: json['reference']?.toString(),
       obtainedAt: json['obtained_at'] != null
-          ? DateTime.tryParse(json['obtained_at'].toString())
+          ? DateTime.tryParse(
+              json['obtained_at'].toString(),
+            )
           : null,
       expiresAt: json['expires_at'] != null
-          ? DateTime.tryParse(json['expires_at'].toString())
+          ? DateTime.tryParse(
+              json['expires_at'].toString(),
+            )
           : null,
       reminderDays: json['reminder_days'] is num
           ? (json['reminder_days'] as num).toInt()
           : null,
       notes: json['notes']?.toString(),
-      isValid:
-          json['is_valid'] == true ||
-          json['is_valid'] == 1 ||
-          json['is_valid']?.toString().toLowerCase() == 'true' ||
-          json['is_valid']?.toString() == '1',
+    isValid:
+        json['is_valid'] == true ||
+        json['is_valid'] == 1 ||
+        json['is_valid']?.toString().toLowerCase() == 'true' ||
+        json['is_valid']?.toString() == '1',
+
     );
   }
 
@@ -55,7 +62,13 @@ class PilotCertification {
 
     final today = DateTime.now();
 
-    return expiresAt!.isBefore(DateTime(today.year, today.month, today.day));
+    return expiresAt!.isBefore(
+      DateTime(
+        today.year,
+        today.month,
+        today.day,
+      ),
+    );
   }
 
   bool get isExpiringSoon {
@@ -66,7 +79,9 @@ class PilotCertification {
     final today = DateTime.now();
     final reminder = reminderDays ?? 30;
 
-    final limit = today.add(Duration(days: reminder));
+    final limit = today.add(
+      Duration(days: reminder),
+    );
 
     return !expiresAt!.isAfter(limit);
   }
@@ -84,7 +99,6 @@ class CompanyPilot {
     required this.joinedAt,
     required this.role,
     required this.certifications,
-    required this.isActive,
   });
 
   final String id;
@@ -98,10 +112,12 @@ class CompanyPilot {
   final DateTime? joinedAt;
   final String role;
   final List<PilotCertification> certifications;
-  final bool isActive;
 
-  factory CompanyPilot.fromJson(Map<String, dynamic> json) {
-    final certificationData = json['certifications'] as List<dynamic>? ?? [];
+  factory CompanyPilot.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    final certificationData =
+        json['certifications'] as List<dynamic>? ?? [];
 
     return CompanyPilot(
       id: json['id']?.toString() ?? '',
@@ -112,18 +128,18 @@ class CompanyPilot {
       lastName: json['last_name']?.toString() ?? '',
       phone: json['phone']?.toString(),
       joinedAt: json['joined_at'] != null
-          ? DateTime.tryParse(json['joined_at'].toString())
+          ? DateTime.tryParse(
+              json['joined_at'].toString(),
+            )
           : null,
-      role: json['role']?.toString().toUpperCase() ?? 'PILOT',
-      isActive:
-          json['is_pilot_active'] == true ||
-          json['is_pilot_active'] == 1 ||
-          json['is_pilot_active']?.toString().toLowerCase() == 'true' ||
-          json['is_pilot_active']?.toString() == '1',
+      role:
+          json['role']?.toString().toUpperCase() ?? 'PILOT',
       certifications: certificationData
           .map(
             (item) => PilotCertification.fromJson(
-              Map<String, dynamic>.from(item as Map),
+              Map<String, dynamic>.from(
+                item as Map,
+              ),
             ),
           )
           .toList(),
@@ -137,13 +153,15 @@ class CompanyPilot {
   }
 
   String get initials {
-    final first = firstName.trim().isNotEmpty
-        ? firstName.trim()[0].toUpperCase()
-        : '';
+    final first =
+        firstName.trim().isNotEmpty
+            ? firstName.trim()[0].toUpperCase()
+            : '';
 
-    final last = lastName.trim().isNotEmpty
-        ? lastName.trim()[0].toUpperCase()
-        : '';
+    final last =
+        lastName.trim().isNotEmpty
+            ? lastName.trim()[0].toUpperCase()
+            : '';
 
     final result = '$first$last';
 
