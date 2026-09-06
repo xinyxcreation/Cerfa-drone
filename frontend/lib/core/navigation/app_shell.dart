@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../features/auth/models/current_user.dart';
 import '../../features/home/presentation/home_page.dart';
 import '../../features/management/presentation/management_page.dart';
+import '../../features/missions/presentation/missions_page.dart';
 import '../../features/profile/presentation/profile_page.dart';
 
 const Color red = Color(0xFFE30613);
@@ -24,9 +25,63 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
 
+  Widget? _managementSubPage;
+  String _managementTitle = 'Gestion';
+  List<Widget>? _managementActions;
+
   void _selectTab(int index) {
     setState(() {
       _currentIndex = index;
+
+      if (index == 4) {
+        _managementSubPage = null;
+        _managementTitle = 'Gestion';
+        _managementActions = null;
+      } else {
+        _managementSubPage = null;
+        _managementTitle = 'Gestion';
+        _managementActions = null;
+      }
+    });
+  }
+
+  void _openManagementPage(Widget page) {
+    setState(() {
+      _managementSubPage = page;
+      _managementTitle = 'Gestion';
+      _managementActions = null;
+    });
+  }
+
+  void _configureManagementAppBar(
+    String title,
+    List<Widget>? actions,
+  ) {
+    if (!mounted ||
+        _currentIndex != 4 ||
+        _managementSubPage == null) {
+      return;
+    }
+
+    if (_managementTitle == title &&
+        ((_managementActions == null && actions == null) ||
+         (_managementActions != null &&
+          actions != null &&
+          _managementActions!.length == actions.length))) {
+      return;
+    }
+
+    setState(() {
+      _managementTitle = title;
+      _managementActions = actions;
+    });
+  }
+
+  void _backToManagement() {
+    setState(() {
+      _managementSubPage = null;
+      _managementTitle = 'Gestion';
+      _managementActions = null;
     });
   }
 
@@ -36,66 +91,99 @@ class _AppShellState extends State<AppShell> {
       backgroundColor: const Color(0xFFF5F5F5),
 
       // ============================================================
+      // APPBAR GLOBALE
+      // ============================================================
+
+      appBar: _currentIndex == 4
+          ? AppBar(
+              backgroundColor: const Color(0xFF111111),
+              foregroundColor: Colors.white,
+              automaticallyImplyLeading: false,
+              titleSpacing: 0,
+
+              leading: _managementSubPage == null
+                  ? null
+                  : IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      tooltip: 'Retour à Gestion',
+                      onPressed: _backToManagement,
+                    ),
+
+              title: Text(
+                _managementTitle,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+
+              actions: _managementActions,
+            )
+          : null,
+
+      // ============================================================
       // CONTENU PRINCIPAL
       // ============================================================
 
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          // --------------------------------------------------------
-          // 0 — ACCUEIL
-          // --------------------------------------------------------
+      body: ManagementAppBarScope(
+        currentTitle: _managementTitle,
+        onChanged: _configureManagementAppBar,
+        child: IndexedStack(
+          index: _currentIndex,
+          children: [
+            // --------------------------------------------------------
+            // 0 — ACCUEIL
+            // --------------------------------------------------------
 
-          HomePage(
-            user: widget.user,
-            onLogout: widget.onLogout,
-            showNavigation: false,
-          ),
+            HomePage(
+              user: widget.user,
+              onLogout: widget.onLogout,
+              showNavigation: false,
+            ),
 
-          // --------------------------------------------------------
-          // 1 — MISSIONS
-          // --------------------------------------------------------
+            // --------------------------------------------------------
+            // 1 — MISSIONS
+            // --------------------------------------------------------
 
-          const _SectionPage(
-            title: 'Missions',
-            icon: Icons.assignment_outlined,
-            description: 'Gérer vos missions',
-          ),
+            const _SectionPage(
+              title: 'Missions',
+              icon: Icons.assignment_outlined,
+              description: 'Gérer vos missions',
+            ),
 
-          // --------------------------------------------------------
-          // 2 — NOUVELLE MISSION
-          // --------------------------------------------------------
+            // --------------------------------------------------------
+            // 2 — NOUVELLE MISSION
+            // --------------------------------------------------------
 
-          const _SectionPage(
-            title: 'Nouvelle mission',
-            icon: Icons.add_circle_outline,
-            description: 'Créer une nouvelle mission',
-          ),
+            const CreateMissionPage(),
 
-          // --------------------------------------------------------
-          // 3 — STATISTIQUES
-          // --------------------------------------------------------
+            // --------------------------------------------------------
+            // 3 — STATISTIQUES
+            // --------------------------------------------------------
 
-          const _SectionPage(
-            title: 'Statistiques',
-            icon: Icons.bar_chart_outlined,
-            description: 'Suivre votre activité',
-          ),
+            const _SectionPage(
+              title: 'Statistiques',
+              icon: Icons.bar_chart_outlined,
+              description: 'Suivre votre activité',
+            ),
 
-          // --------------------------------------------------------
-          // 4 — GESTION
-          // --------------------------------------------------------
+            // --------------------------------------------------------
+            // 4 — GESTION
+            // --------------------------------------------------------
 
-          ManagementPage(
-            user: widget.user,
-          ),
+            _managementSubPage ??
+                ManagementPage(
+                  user: widget.user,
+                  onOpenPage: _openManagementPage,
+                ),
 
-          // --------------------------------------------------------
-          // 5 — MON PROFIL
-          // --------------------------------------------------------
+            // --------------------------------------------------------
+            // 5 — MON PROFIL
+            // --------------------------------------------------------
 
-          const ProfilePage(),
-        ],
+            const ProfilePage(),
+          ],
+        ),
       ),
 
       // ============================================================
@@ -275,10 +363,13 @@ class _NavigationItem extends StatelessWidget {
     return InkWell(
       onTap: () => onTap(index),
       borderRadius: BorderRadius.circular(18),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AnimatedContainer(
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            AnimatedContainer(
             duration: const Duration(
               milliseconds: 180,
             ),
@@ -301,20 +392,25 @@ class _NavigationItem extends StatelessWidget {
 
           const SizedBox(height: 3),
 
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: active
-              ? FontWeight.w600
-              : FontWeight.w400,
-              color: active
-              ? red
-              : const Color(0xFF444444),
+            SizedBox(
+              width: double.infinity,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: active
+                  ? FontWeight.w600
+                  : FontWeight.w400,
+                  color: active
+                  ? red
+                  : const Color(0xFF444444),
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -372,7 +468,7 @@ class _NewMissionButton extends StatelessWidget {
           const SizedBox(height: 2),
 
           const Text(
-            'Nouvelle',
+            'Nouvelle mission',
             style: TextStyle(
               fontSize: 10,
               color: Color(0xFF444444),

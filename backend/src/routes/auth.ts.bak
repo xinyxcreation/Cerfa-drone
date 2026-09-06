@@ -2,12 +2,8 @@ import { FastifyInstance } from 'fastify';
 
 import { AuthController } from '../controllers/AuthController.js';
 import { CompanyPilotController } from '../controllers/CompanyPilotController.js';
-import { CompanyMissionController } from '../controllers/CompanyMissionController.js';
 import { CompanyController } from '../controllers/CompanyController.js';
 import { CompanyDroneController } from '../controllers/CompanyDroneController.js';
-import { CompanyMissionCategoryController } from '../controllers/CompanyMissionCategoryController.js';
-import { CompanyClientController } from '../controllers/CompanyClientController.js';
-import { CompanySiteController } from '../controllers/CompanySiteController.js';
 
 export default async function authRoutes(
     app: FastifyInstance
@@ -24,15 +20,6 @@ export default async function authRoutes(
 
     const droneController =
         new CompanyDroneController();
-
-    const categoryController =
-        new CompanyMissionCategoryController();
-
-    const clientController =
-        new CompanyClientController();
-
-    const siteController =
-        new CompanySiteController();
 
     // ============================================================
     // AUTHENTIFICATION
@@ -285,181 +272,6 @@ export default async function authRoutes(
         },
         pilotController.deactivate.bind(
             pilotController
-        )
-    );
-
-    // ============================================================
-    // SITES
-    // ============================================================
-
-    app.get(
-        '/company/sites',
-        siteController.list.bind(siteController)
-    );
-
-    app.post(
-        '/company/sites',
-        siteController.create.bind(siteController)
-    );
-
-    app.put(
-        '/company/sites/:siteId',
-        siteController.update.bind(siteController)
-    );
-
-    // ============================================================
-    // CLIENTS
-    // ============================================================
-
-    app.get(
-        '/company/clients',
-        clientController.list.bind(clientController)
-    );
-
-    app.post(
-        '/company/clients',
-        clientController.create.bind(clientController)
-    );
-
-    app.put(
-        '/company/clients/:clientId',
-        clientController.update.bind(clientController)
-    );
-
-    // ============================================================
-    // CATÉGORIES DE MISSIONS
-    // ============================================================
-
-    app.get(
-        '/company/categories',
-        categoryController.list.bind(categoryController)
-    );
-
-    app.post(
-        '/company/categories',
-        categoryController.create.bind(categoryController)
-    );
-
-    app.put(
-        '/company/categories/:categoryId',
-        categoryController.update.bind(categoryController)
-    );
-
-    app.patch(
-        '/company/categories/:categoryId/activate',
-        categoryController.activate.bind(categoryController)
-    );
-
-    app.patch(
-        '/company/categories/:categoryId/deactivate',
-        categoryController.deactivate.bind(categoryController)
-    );
-
-    app.delete(
-        '/company/categories/:categoryId',
-        categoryController.delete.bind(categoryController)
-    );
-
-    // ============================================================
-    // MISSIONS
-    // ============================================================
-
-    const missionController =
-        new CompanyMissionController();
-
-    app.get(
-        '/company/missions/references',
-        {
-            preHandler: async request => {
-                await request.jwtVerify();
-            }
-        },
-        missionController.references.bind(
-            missionController
-        )
-    );
-
-    app.get(
-        '/company/missions',
-        {
-            preHandler: async request => {
-                await request.jwtVerify();
-            }
-        },
-        missionController.list.bind(
-            missionController
-        )
-    );
-
-    app.get(
-        '/company/missions/:missionId',
-        {
-            preHandler: async request => {
-                await request.jwtVerify();
-            }
-        },
-        missionController.get.bind(
-            missionController
-        )
-    );
-
-    app.post(
-        '/company/missions',
-        {
-            preHandler: async request => {
-                await request.jwtVerify();
-            }
-        },
-        missionController.create.bind(
-            missionController
-        )
-    );
-
-    app.put(
-        '/company/missions/:missionId',
-        {
-            preHandler: async request => {
-                await request.jwtVerify();
-            }
-        },
-        missionController.update.bind(
-            missionController
-        )
-    );
-
-    app.patch(
-        '/company/missions/:missionId/status',
-        {
-            preHandler: async request => {
-                await request.jwtVerify();
-            }
-        },
-        missionController.status.bind(
-            missionController
-        )
-    );
-
-    app.patch(
-        '/company/missions/:missionId/archive',
-        {
-            preHandler: async request => {
-                await request.jwtVerify();
-            }
-        },
-        missionController.archive.bind(
-            missionController
-        )
-    );
-
-    app.delete(
-        '/company/missions/:missionId',
-        {
-            preHandler: async request => {
-                await request.jwtVerify();
-            }
-        },
-        missionController.delete.bind(
-            missionController
         )
     );
 }

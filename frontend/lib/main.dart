@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/theme/app_theme.dart';
 import 'features/auth/models/current_user.dart';
@@ -130,6 +131,16 @@ extends State<CerfaDroneApp> {
     BuildContext context,
   ) {
     return MaterialApp(
+      locale: const Locale('fr', 'FR'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('fr', 'FR'),
+      ],
+
       debugShowCheckedModeBanner: false,
 
       title: 'CERFA DRONE',

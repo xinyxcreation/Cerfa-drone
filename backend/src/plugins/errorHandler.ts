@@ -40,6 +40,33 @@ export default fp(async (app) => {
     ? error.code
     : undefined;
 
+      /*
+       * Doublon en base de données.
+       *
+       * MariaDB renvoie ER_DUP_ENTRY lorsqu'une contrainte
+       * UNIQUE est violée.
+       */
+      if (
+          errorCode ===
+          'ER_DUP_ENTRY'
+      ) {
+
+          return reply
+          .status(409)
+          .send({
+
+              success: false,
+
+              code: 'DUPLICATE_ENTRY',
+
+              message:
+              'Cette valeur est déjà utilisée.'
+
+          });
+
+      }
+
+
     /*
      * Aucun token.
      */

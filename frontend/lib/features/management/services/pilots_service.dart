@@ -84,6 +84,108 @@ class PilotsService {
     }
   }
 
+
+  static Future<List<Map<String, dynamic>>> getCertificationTypes() async {
+    try {
+      final response = await ApiClient.instance.get(
+        '/auth/company/pilots/certification-types',
+      );
+
+      final data = Map<String, dynamic>.from(
+        response.data as Map,
+      );
+
+      final types = data['certification_types'] as List<dynamic>? ?? [];
+
+      return types
+          .map(
+            (item) => Map<String, dynamic>.from(
+              item as Map,
+            ),
+          )
+          .toList();
+    } on DioException catch (error) {
+      throw Exception(
+        _messageFromError(
+          error,
+          'Impossible de charger les types de certification.',
+        ),
+      );
+    }
+  }
+
+  static Future<void> createCertification({
+    required String pilotId,
+    required String code,
+    required DateTime obtainedAt,
+    DateTime? expiresAt,
+    int? reminderDays,
+    String? notes,
+  }) async {
+    try {
+      await ApiClient.instance.post(
+        '/auth/company/pilots/$pilotId/certifications',
+        data: {
+          'code': code,
+          'obtained_at':
+              '${obtainedAt.year.toString().padLeft(4, '0')}-'
+              '${obtainedAt.month.toString().padLeft(2, '0')}-'
+              '${obtainedAt.day.toString().padLeft(2, '0')}',
+          'expires_at': expiresAt == null
+              ? null
+              : '${expiresAt.year.toString().padLeft(4, '0')}-'
+                '${expiresAt.month.toString().padLeft(2, '0')}-'
+                '${expiresAt.day.toString().padLeft(2, '0')}',
+          'reminder_days': reminderDays,
+          'notes': notes == null || notes.trim().isEmpty
+              ? null
+              : notes.trim(),
+        },
+      );
+    } on DioException catch (error) {
+      throw Exception(
+        _messageFromError(
+          error,
+          'Impossible d’enregistrer la certification.',
+        ),
+      );
+    }
+  }
+
+  static Future<List<PilotCertification>> getCertifications(
+    String pilotId,
+  ) async {
+    try {
+      final response = await ApiClient.instance.get(
+        '/auth/company/pilots/$pilotId/certifications',
+      );
+
+      final data = Map<String, dynamic>.from(
+        response.data as Map,
+      );
+
+      final certifications =
+          data['certifications'] as List<dynamic>? ?? [];
+
+      return certifications
+          .map(
+            (item) => PilotCertification.fromJson(
+              Map<String, dynamic>.from(
+                item as Map,
+              ),
+            ),
+          )
+          .toList();
+    } on DioException catch (error) {
+      throw Exception(
+        _messageFromError(
+          error,
+          'Impossible de charger les certifications.',
+        ),
+      );
+    }
+  }
+
   static Future<void> setCurrentUserPilot(
     bool isPilot,
   ) async {

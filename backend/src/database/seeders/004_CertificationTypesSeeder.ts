@@ -50,7 +50,7 @@ export class CertificationTypesSeeder extends BaseSeeder implements Seeder {
                 code: 'STS_01',
                 label: 'STS-01',
                 description: 'Scénario standard européen STS-01',
-                default_validity_days: null,
+                default_validity_days: 1825,
                     default_reminder_days: 90,
                         is_active: true,
                         sort_order: 3
@@ -66,7 +66,7 @@ export class CertificationTypesSeeder extends BaseSeeder implements Seeder {
                 code: 'STS_02',
                 label: 'STS-02',
                 description: 'Scénario standard européen STS-02',
-                default_validity_days: null,
+                default_validity_days: 1825,
                     default_reminder_days: 90,
                         is_active: true,
                         sort_order: 4

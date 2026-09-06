@@ -8,6 +8,8 @@ environment:
   sdk: ^3.12.2
 
 dependencies:
+  flutter_localizations:
+    sdk: flutter
   flutter:
     sdk: flutter
 

@@ -8,12 +8,20 @@ import {
 } from '../schemas/company/CreatePilotSchema.js';
 
 import {
+    CreateCertificationSchema
+} from '../schemas/company/CertificationSchema.js';
+
+import {
     CompanyPilotService
 } from '../services/CompanyPilotService.js';
 
 import {
     CompanyUserRepository
 } from '../repositories/CompanyUserRepository.js';
+
+import {
+    CertificationRepository
+} from '../repositories/CertificationRepository.js';
 
 import {
     AuthorizationError
@@ -32,6 +40,9 @@ export class CompanyPilotController {
 
     private readonly companyUsers =
     new CompanyUserRepository();
+
+    private readonly certificationRepository =
+    new CertificationRepository();
 
     private readonly service =
     new CompanyPilotService();
@@ -79,37 +90,240 @@ export class CompanyPilotController {
             payload.company_id
         );
 
+        const pilotsWithCertifications =
+        await Promise.all(
+            pilots.map(async pilot => {
+
+                const certifications =
+                await this.certificationRepository.findByPilotId(
+                    pilot.user_id
+                );
+
+                return {
+
+                    id:
+                    pilot.user_id,
+
+                    email:
+                    pilot.email,
+
+                    first_name:
+                    pilot.firstname,
+
+                    last_name:
+                    pilot.lastname,
+
+                    phone:
+                    pilot.phone,
+
+                    company_name:
+                    pilot.company_name,
+
+                    joined_at:
+                    pilot.joined_at,
+
+                    is_pilot:
+                    pilot.is_pilot,
+
+                    certifications:
+                    certifications.map(certification => ({
+                        id:
+                        certification.id,
+
+                        code:
+                        certification.code,
+
+                        label:
+                        certification.label,
+
+                        description:
+                        certification.description,
+
+                        reference:
+                        certification.reference,
+
+                        obtained_at:
+                        certification.obtained_at,
+
+                        expires_at:
+                        certification.expires_at,
+
+                        reminder_days:
+                        certification.reminder_days,
+
+                        is_valid:
+                        certification.is_valid,
+
+                        notes:
+                        certification.notes
+                    }))
+                };
+            })
+        );
+
         reply.send({
 
             success: true,
 
-            pilots: pilots.map(pilot => ({
+            pilots:
+            pilotsWithCertifications
+        });
+    }
 
-                id:
-                pilot.user_id,
 
-                email:
-                pilot.email,
+    // ============================================================
+    // TYPES DE CERTIFICATIONS
+    // ============================================================
 
-                first_name:
-                pilot.firstname,
+    public async certificationTypes(
+        request: FastifyRequest,
+        reply: FastifyReply
+    ): Promise<void> {
 
-                last_name:
-                pilot.lastname,
+        const payload =
+            await request.jwtVerify<AuthPayload>();
 
-                phone:
-                pilot.phone,
+        this.checkManagementAccess(
+            payload.role
+        );
 
-                company_name:
-                pilot.company_name,
+        const types =
+            await this.certificationRepository.findTypes();
 
-                joined_at:
-                pilot.joined_at,
+        reply.send({
+            success: true,
+            certification_types: types
+        });
+    }
 
-                is_pilot:
-                pilot.is_pilot
+    // ============================================================
+    // CERTIFICATIONS D'UN PILOTE
+    // ============================================================
 
-            }))
+    public async certifications(
+        request: FastifyRequest,
+        reply: FastifyReply
+    ): Promise<void> {
+
+        const payload =
+            await request.jwtVerify<AuthPayload>();
+
+        this.checkManagementAccess(
+            payload.role
+        );
+
+        const { pilotId } =
+            request.params as { pilotId: string };
+
+        const membership =
+            await this.companyUsers.findByCompanyAndUser(
+                payload.company_id,
+                pilotId
+            );
+
+        if (
+            !membership ||
+            membership.company_id !== payload.company_id ||
+            !membership.is_active ||
+            !membership.is_pilot
+        ) {
+            throw new AuthorizationError(
+                'Pilote introuvable dans cette entreprise.'
+            );
+        }
+
+        const certifications =
+            await this.certificationRepository.findByPilotId(
+                membership.user_id
+            );
+
+        reply.send({
+            success: true,
+            certifications
+        });
+    }
+
+    // ============================================================
+    // AJOUTER UNE CERTIFICATION
+    // ============================================================
+
+    public async createCertification(
+        request: FastifyRequest,
+        reply: FastifyReply
+    ): Promise<void> {
+
+        const payload =
+            await request.jwtVerify<AuthPayload>();
+
+        this.checkManagementAccess(
+            payload.role
+        );
+
+        const { pilotId } =
+            request.params as { pilotId: string };
+
+        const membership =
+            await this.companyUsers.findByCompanyAndUser(
+                payload.company_id,
+                pilotId
+            );
+
+        if (
+            !membership ||
+            membership.company_id !== payload.company_id ||
+            !membership.is_active ||
+            !membership.is_pilot
+        ) {
+            throw new AuthorizationError(
+                'Pilote introuvable dans cette entreprise.'
+            );
+        }
+
+        const body =
+            CreateCertificationSchema.parse(
+                request.body
+            );
+
+        const type =
+            await this.certificationRepository.findTypeByCode(
+                body.code
+            );
+
+        if (!type) {
+            throw new Error(
+                'Type de certification invalide.'
+            );
+        }
+
+        const obtainedAt =
+            new Date(body.obtained_at);
+
+        let expiresAt: Date | null = null;
+
+        if (type.default_validity_days !== null) {
+            expiresAt = new Date(obtainedAt);
+            expiresAt.setUTCDate(
+                expiresAt.getUTCDate() +
+                    type.default_validity_days
+            );
+        } else if (body.expires_at) {
+            expiresAt = new Date(body.expires_at);
+        }
+
+        const id =
+            await this.certificationRepository.create(
+                membership.user_id,
+                type.id,
+                obtainedAt,
+                expiresAt,
+                body.reminder_days ??
+                    type.default_reminder_days,
+                body.notes ?? null
+            );
+
+        reply.code(201).send({
+            success: true,
+            id
         });
     }
 

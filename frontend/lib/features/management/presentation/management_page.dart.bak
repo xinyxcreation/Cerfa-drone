@@ -7,45 +7,14 @@ import '../services/pilots_service.dart';
 import '../services/drones_service.dart';
 import '../../models/company.dart';
 import '../../company/services/company_service.dart';
-import 'sites_page.dart';
-import 'mission_categories_page.dart';
-
-class ManagementAppBarScope extends InheritedWidget {
-  const ManagementAppBarScope({
-    super.key,
-    required this.currentTitle,
-    required this.onChanged,
-    required super.child,
-  });
-
-  final String currentTitle;
-  final void Function(
-    String title,
-    List<Widget>? actions,
-  ) onChanged;
-
-  static ManagementAppBarScope? maybeOf(BuildContext context) {
-    return context.dependOnInheritedWidgetOfExactType<
-        ManagementAppBarScope>();
-  }
-
-  @override
-  bool updateShouldNotify(
-    ManagementAppBarScope oldWidget,
-  ) {
-    return currentTitle != oldWidget.currentTitle;
-  }
-}
 
 class ManagementPage extends StatelessWidget {
   const ManagementPage({
     super.key,
     required this.user,
-    required this.onOpenPage,
   });
 
   final CurrentUser user;
-  final ValueChanged<Widget> onOpenPage;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +24,20 @@ class ManagementPage extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
+
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF111111),
+        foregroundColor: Colors.white,
+          automaticallyImplyLeading: false,
+          titleSpacing: 16,
+          title: const Text(
+            'Gestion',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+      ),
 
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
@@ -70,9 +53,11 @@ class ManagementPage extends StatelessWidget {
               title: 'Entreprise',
               subtitle: user.companyName,
               onTap: () {
-                onOpenPage(
-                  CompanyPage(
-                    user: user,
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => CompanyPage(
+                      user: user,
+                    ),
                   ),
                 );
               },
@@ -86,9 +71,12 @@ class ManagementPage extends StatelessWidget {
                 title: 'Pilotes',
                 subtitle: 'Gérer les pilotes de l’entreprise',
                 onTap: () {
-                  onOpenPage(
-                    PilotsPage(
-                      user: user,
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) =>
+                      PilotsPage(
+                        user: user,
+                      ),
                     ),
                   );
                 },
@@ -102,8 +90,10 @@ class ManagementPage extends StatelessWidget {
                 subtitle:
                 'Gérer les drones de l’entreprise',
                 onTap: () {
-                  onOpenPage(
-                    const DronesPage(),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const DronesPage(),
+                    ),
                   );
                 },
               ),
@@ -116,22 +106,10 @@ class ManagementPage extends StatelessWidget {
                 subtitle:
                 'Gérer les sites d’intervention',
                 onTap: () {
-                  onOpenPage(
-                    const SitesPage(),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 12),
-
-              _ManagementCard(
-                icon: Icons.category_outlined,
-                title: 'Catégories',
-                subtitle:
-                'Gérer les catégories de missions',
-                onTap: () {
-                  onOpenPage(
-                    const MissionCategoriesPage(),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SitesPage(),
+                    ),
                   );
                 },
               ),
@@ -144,8 +122,10 @@ class ManagementPage extends StatelessWidget {
                 subtitle:
                 'Documents et justificatifs',
                 onTap: () {
-                  onOpenPage(
-                    const DocumentsPage(),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const DocumentsPage(),
+                    ),
                   );
                 },
               ),
@@ -158,8 +138,10 @@ class ManagementPage extends StatelessWidget {
                 subtitle:
                 'Configuration de CERFA DRONE',
                 onTap: () {
-                  onOpenPage(
-                    const SettingsPage(),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const SettingsPage(),
+                    ),
                   );
                 },
               ),
@@ -536,7 +518,23 @@ class _CompanyHeaderCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const SizedBox(height: 4),
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color:
+              const Color(0xFFFFE4E4),
+              borderRadius:
+              BorderRadius.circular(22),
+            ),
+            child: const Icon(
+              Icons.business_outlined,
+              color: Color(0xFFE30613),
+              size: 38,
+            ),
+          ),
+
+          const SizedBox(height: 14),
 
           Text(
             company.name,
@@ -3313,32 +3311,41 @@ extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scope = ManagementAppBarScope.maybeOf(context);
-
-    if (scope != null && scope.currentTitle != title) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          scope.onChanged(title, actions);
-        }
-      });
-    }
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor:
+      const Color(0xFFF5F5F5),
+
+      appBar: AppBar(
+        backgroundColor:
+        const Color(0xFF111111),
+        foregroundColor: Colors.white,
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          actions: actions,
+      ),
 
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding:
+        const EdgeInsets.all(16),
         children: [
           Container(
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: const Color(0xFFFFE4E4),
-              borderRadius: BorderRadius.circular(17),
+              color:
+              const Color(0xFFFFE4E4),
+              borderRadius:
+              BorderRadius.circular(17),
             ),
             child: Icon(
               icon,
-              color: const Color(0xFFE30613),
+              color:
+              const Color(0xFFE30613),
               size: 30,
             ),
           ),
@@ -4807,6 +4814,32 @@ class _DroneFormPage extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+// ==================================================================
+// SITES
+// ==================================================================
+
+class SitesPage extends StatelessWidget {
+  const SitesPage({
+    super.key,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _ManagementSubPage(
+      title: 'Sites',
+      icon: Icons.location_on_outlined,
+      children: [
+        _EmptyManagementState(
+          icon: Icons.location_on_outlined,
+          title: 'Aucun site chargé',
+          message:
+          'Les sites d’intervention seront affichés ici.',
         ),
       ],
     );
