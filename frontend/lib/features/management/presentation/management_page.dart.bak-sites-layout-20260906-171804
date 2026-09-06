@@ -4581,7 +4581,6 @@ class _CreateSitePageState extends State<_CreateSitePage> {
     return _ManagementSubPage(
       title: widget.site == null ? 'Nouveau site' : 'Modifier le site',
       icon: Icons.location_on_outlined,
-      scrollable: false,
       children: [
         _loading
             ? const Center(child: CircularProgressIndicator())
