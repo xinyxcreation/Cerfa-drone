@@ -26,62 +26,22 @@ class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
 
   Widget? _managementSubPage;
-  String _managementTitle = 'Gestion';
-  List<Widget>? _managementActions;
-
   void _selectTab(int index) {
     setState(() {
       _currentIndex = index;
-
-      if (index == 4) {
-        _managementSubPage = null;
-        _managementTitle = 'Gestion';
-        _managementActions = null;
-      } else {
-        _managementSubPage = null;
-        _managementTitle = 'Gestion';
-        _managementActions = null;
-      }
+      _managementSubPage = null;
     });
   }
 
   void _openManagementPage(Widget page) {
     setState(() {
       _managementSubPage = page;
-      _managementTitle = 'Gestion';
-      _managementActions = null;
-    });
-  }
-
-  void _configureManagementAppBar(
-    String title,
-    List<Widget>? actions,
-  ) {
-    if (!mounted ||
-        _currentIndex != 4 ||
-        _managementSubPage == null) {
-      return;
-    }
-
-    if (_managementTitle == title &&
-        ((_managementActions == null && actions == null) ||
-         (_managementActions != null &&
-          actions != null &&
-          _managementActions!.length == actions.length))) {
-      return;
-    }
-
-    setState(() {
-      _managementTitle = title;
-      _managementActions = actions;
     });
   }
 
   void _backToManagement() {
     setState(() {
       _managementSubPage = null;
-      _managementTitle = 'Gestion';
-      _managementActions = null;
     });
   }
 
@@ -91,43 +51,11 @@ class _AppShellState extends State<AppShell> {
       backgroundColor: const Color(0xFFF5F5F5),
 
       // ============================================================
-      // APPBAR GLOBALE
-      // ============================================================
-
-      appBar: _currentIndex == 4
-          ? AppBar(
-              backgroundColor: const Color(0xFF111111),
-              foregroundColor: Colors.white,
-              automaticallyImplyLeading: false,
-              titleSpacing: 0,
-
-              leading: _managementSubPage == null
-                  ? null
-                  : IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      tooltip: 'Retour à Gestion',
-                      onPressed: _backToManagement,
-                    ),
-
-              title: Text(
-                _managementTitle,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-
-              actions: _managementActions,
-            )
-          : null,
-
-      // ============================================================
       // CONTENU PRINCIPAL
       // ============================================================
 
-      body: ManagementAppBarScope(
-        currentTitle: _managementTitle,
-        onChanged: _configureManagementAppBar,
+      body: ManagementBackScope(
+        onBack: _backToManagement,
         child: IndexedStack(
           index: _currentIndex,
           children: [
