@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
@@ -9,6 +10,10 @@ class PilotsService {
   static Future<List<CompanyPilot>> getPilots() async {
     try {
       final response = await ApiClient.instance.get('/auth/company/pilots');
+
+      debugPrint('========== DEBUG PILOTS API ==========');
+      debugPrint(response.data.toString());
+      debugPrint('======================================');
 
       final data = Map<String, dynamic>.from(response.data as Map);
 
