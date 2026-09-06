@@ -125,9 +125,6 @@ export class CompanyPilotController {
                     is_pilot:
                     pilot.is_pilot,
 
-                    is_pilot_active:
-                    pilot.is_pilot_active,
-
                     certifications:
                     certifications.map(certification => ({
                         id:
